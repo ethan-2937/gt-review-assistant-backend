@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.jzyz.gtreviewassistant.mapper.StructureDiffMapper">
+    <insert id="insert" parameterType="StructureDiff" useGeneratedKeys="true" keyProperty="id">
+        insert into structure_diff
+        (project_id, note_no, note_name, diff_level, diff_type, pdf_ref_type, pdf_ref_id, excel_ref_type, excel_ref_id,
+         pdf_text, excel_text, plain_summary, impact_summary, status, created_at)
+        values
+        (#{projectId}, #{noteNo}, #{noteName}, #{diffLevel}, #{diffType}, #{pdfRefType}, #{pdfRefId}, #{excelRefType}, #{excelRefId},
+         #{pdfText}, #{excelText}, #{plainSummary}, #{impactSummary}, #{status}, #{createdAt})
+    </insert>
+
+    <delete id="deleteByProject">
+        delete from structure_diff where project_id = #{projectId}
+    </delete>
+
+    <select id="selectByProject" resultType="StructureDiff">
+        select * from structure_diff
+        where project_id = #{projectId}
+        <if test="noteNo != null and noteNo != ''">
+            and note_no = #{noteNo}
+        </if>
+        <if test="diffLevel != null and diffLevel != ''">
+            and diff_level = #{diffLevel}
+        </if>
+        order by note_no + 0, note_no, diff_level, id
+    </select>
+
+    <select id="countByProject" resultType="int">
+        select count(*) from structure_diff where project_id = #{projectId}
+    </select>
+
+    <select id="countByProjectAndLevel" resultType="int">
+        select count(*) from structure_diff where project_id = #{projectId} and diff_level = #{diffLevel}
+    </select>
+
+    <select id="countByProjectAndNote" resultType="int">
+        select count(*) from structure_diff where project_id = #{projectId} and note_no = #{noteNo}
+    </select>
+</mapper>

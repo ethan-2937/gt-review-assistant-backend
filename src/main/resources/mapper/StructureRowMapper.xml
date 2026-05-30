@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.jzyz.gtreviewassistant.mapper.StructureRowMapper">
+    <insert id="insert" parameterType="StructureRow" useGeneratedKeys="true" keyProperty="id">
+        insert into structure_row
+        (table_id, project_id, side, note_no, table_title, row_key, row_path, row_leaf, row_order, source_locator, created_at, updated_at)
+        values
+        (#{tableId}, #{projectId}, #{side}, #{noteNo}, #{tableTitle}, #{rowKey}, #{rowPath}, #{rowLeaf}, #{rowOrder}, #{sourceLocator}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <delete id="deleteByProjectAndSide">
+        delete from structure_row where project_id = #{projectId} and side = #{side}
+    </delete>
+
+    <select id="selectByTableId" resultType="StructureRow">
+        select * from structure_row where table_id = #{tableId} order by row_order, id
+    </select>
+
+    <select id="selectByProjectNoteSide" resultType="StructureRow">
+        select * from structure_row
+        where project_id = #{projectId} and note_no = #{noteNo} and side = #{side}
+        order by table_title, row_order, id
+    </select>
+</mapper>

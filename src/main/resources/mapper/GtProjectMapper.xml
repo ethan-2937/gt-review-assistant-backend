@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.jzyz.gtreviewassistant.mapper.GtProjectMapper">
+    <insert id="insert" parameterType="GtProject" useGeneratedKeys="true" keyProperty="id">
+        insert into gt_project
+        (project_key, name, year_label, dataset_key, version_label, status, created_by, created_at, updated_at)
+        values
+        (#{projectKey}, #{name}, #{yearLabel}, #{datasetKey}, #{versionLabel}, #{status}, #{createdBy}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <select id="selectById" resultType="GtProject">
+        select * from gt_project where id = #{id}
+    </select>
+
+    <select id="selectByProjectKey" resultType="GtProject">
+        select * from gt_project where project_key = #{projectKey}
+    </select>
+
+    <select id="selectAll" resultType="GtProject">
+        select * from gt_project order by id desc
+    </select>
+</mapper>

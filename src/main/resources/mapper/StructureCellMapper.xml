@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.jzyz.gtreviewassistant.mapper.StructureCellMapper">
+    <insert id="insert" parameterType="StructureCell" useGeneratedKeys="true" keyProperty="id">
+        insert into structure_cell
+        (table_id, row_id, column_id, project_id, side, note_no, table_title, row_key, column_key, row_path, column_path,
+         value_text, normalized_value, source_locator, screenshot_path, created_at, updated_at)
+        values
+        (#{tableId}, #{rowId}, #{columnId}, #{projectId}, #{side}, #{noteNo}, #{tableTitle}, #{rowKey}, #{columnKey}, #{rowPath}, #{columnPath},
+         #{valueText}, #{normalizedValue}, #{sourceLocator}, #{screenshotPath}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <delete id="deleteByProjectAndSide">
+        delete from structure_cell where project_id = #{projectId} and side = #{side}
+    </delete>
+
+    <select id="selectByTableId" resultType="StructureCell">
+        select * from structure_cell where table_id = #{tableId} order by id
+    </select>
+
+    <select id="selectByProjectNoteSide" resultType="StructureCell">
+        select * from structure_cell
+        where project_id = #{projectId} and note_no = #{noteNo} and side = #{side}
+        order by table_title, row_key, column_key, id
+    </select>
+</mapper>

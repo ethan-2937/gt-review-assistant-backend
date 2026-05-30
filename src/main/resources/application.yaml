@@ -1,0 +1,29 @@
+server:
+  port: ${GT_REVIEW_SERVER_PORT:18081}
+
+spring:
+  application:
+    name: gt-review-assistant
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${GT_REVIEW_DB_URL:jdbc:mysql://localhost:3306/gt-review-assistant?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${GT_REVIEW_DB_USERNAME:root}
+    password: ${GT_REVIEW_DB_PASSWORD:root}
+  sql:
+    init:
+      mode: never
+  jackson:
+    time-zone: Asia/Shanghai
+    date-format: yyyy-MM-dd HH:mm:ss
+    default-property-inclusion: non_null
+
+mybatis:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.jzyz.gtreviewassistant.domain.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    jdbc-type-for-null: 'NULL'
+
+logging:
+  level:
+    com.jzyz.gtreviewassistant: info
