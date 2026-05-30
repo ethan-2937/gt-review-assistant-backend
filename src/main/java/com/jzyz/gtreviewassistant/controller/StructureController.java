@@ -4,6 +4,8 @@ import com.jzyz.gtreviewassistant.common.ApiResponse;
 import com.jzyz.gtreviewassistant.domain.dto.ImportResult;
 import com.jzyz.gtreviewassistant.domain.dto.NoteDetail;
 import com.jzyz.gtreviewassistant.domain.dto.NoteSummary;
+import com.jzyz.gtreviewassistant.domain.dto.PageResult;
+import com.jzyz.gtreviewassistant.domain.dto.StructureCoverageItem;
 import com.jzyz.gtreviewassistant.domain.dto.StructureImportRequest;
 import com.jzyz.gtreviewassistant.domain.dto.StructureOverview;
 import com.jzyz.gtreviewassistant.domain.entity.StructureDiff;
@@ -56,6 +58,16 @@ public class StructureController {
     @GetMapping("/notes/{noteNo}")
     public ApiResponse<NoteDetail> noteDetail(@PathVariable Long projectId, @PathVariable String noteNo) {
         return ApiResponse.ok(queryService.noteDetail(projectId, noteNo));
+    }
+
+    @GetMapping("/notes/{noteNo}/coverage")
+    public ApiResponse<PageResult<StructureCoverageItem>> coverageItems(@PathVariable Long projectId,
+                                                                        @PathVariable String noteNo,
+                                                                        @RequestParam(defaultValue = "cell") String level,
+                                                                        @RequestParam(required = false) String keyword,
+                                                                        @RequestParam(defaultValue = "1") int pageNum,
+                                                                        @RequestParam(defaultValue = "20") int pageSize) {
+        return ApiResponse.ok(queryService.coverageItems(projectId, noteNo, level, keyword, pageNum, pageSize));
     }
 
     @GetMapping("/diffs")

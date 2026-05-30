@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.jzyz.gtreviewassistant.mapper.StructureCoverageMapper">
+    <select id="selectCoverageItems" resultType="com.jzyz.gtreviewassistant.domain.dto.StructureCoverageItem">
+        <choose>
+            <when test="level == 'row'">
+                select
+                    'row' as level,
+                    concat(coalesce(table_title, '默认表'), '|', coalesce(row_key, coalesce(row_path, row_leaf, ''))) as item_key,
+                    max(note_no) as note_no,
+                    max(case when side = 'PDF' then concat(coalesce(table_title, '默认表'), ' / 行') end) as pdf_title,
+                    max(case when side = 'PDF' then coalesce(nullif(row_path, ''), nullif(row_leaf, ''), row_key) end) as pdf_detail,
+                    max(case when side = 'PDF' then source_locator end) as pdf_locator,
+                    max(case when side = 'EXCEL' then concat(coalesce(table_title, '默认表'), ' / 行') end) as excel_title,
+                    max(case when side = 'EXCEL' then coalesce(nullif(row_path, ''), nullif(row_leaf, ''), row_key) end) as excel_detail,
+                    max(case when side = 'EXCEL' then source_locator end) as excel_locator,
+                    false as runtime_recognized,
+                    'MISSING' as runtime_status,
+                    null as runtime_title,
+                    '当前还没有导入 runtime 结构，先按未识别展示' as runtime_detail,
+                    null as runtime_locator
+                from structure_row
+                where project_id = #{projectId}
+                  and note_no = #{noteNo}
+                <if test="keyword != null and keyword != ''">
+                  and (
+                    table_title like concat('%', #{keyword}, '%')
+                    or row_key like concat('%', #{keyword}, '%')
+                    or row_path like concat('%', #{keyword}, '%')
+                    or row_leaf like concat('%', #{keyword}, '%')
+                    or source_locator like concat('%', #{keyword}, '%')
+                  )
+                </if>
+                group by concat(coalesce(table_title, '默认表'), '|', coalesce(row_key, coalesce(row_path, row_leaf, '')))
+                order by item_key
+            </when>
+            <when test="level == 'column'">
+                select
+                    'column' as level,
+                    concat(coalesce(table_title, '默认表'), '|', coalesce(column_key, coalesce(column_path, column_leaf, ''))) as item_key,
+                    max(note_no) as note_no,
+                    max(case when side = 'PDF' then concat(coalesce(table_title, '默认表'), ' / 列名') end) as pdf_title,
+                    max(case when side = 'PDF' then coalesce(nullif(column_path, ''), nullif(column_leaf, ''), column_key) end) as pdf_detail,
+                    max(case when side = 'PDF' then source_locator end) as pdf_locator,
+                    max(case when side = 'EXCEL' then concat(coalesce(table_title, '默认表'), ' / 列名') end) as excel_title,
+                    max(case when side = 'EXCEL' then coalesce(nullif(column_path, ''), nullif(column_leaf, ''), column_key) end) as excel_detail,
+                    max(case when side = 'EXCEL' then source_locator end) as excel_locator,
+                    false as runtime_recognized,
+                    'MISSING' as runtime_status,
+                    null as runtime_title,
+                    '当前还没有导入 runtime 结构，先按未识别展示' as runtime_detail,
+                    null as runtime_locator
+                from structure_column
+                where project_id = #{projectId}
+                  and note_no = #{noteNo}
+                <if test="keyword != null and keyword != ''">
+                  and (
+                    table_title like concat('%', #{keyword}, '%')
+                    or column_key like concat('%', #{keyword}, '%')
+                    or column_path like concat('%', #{keyword}, '%')
+                    or column_leaf like concat('%', #{keyword}, '%')
+                    or source_locator like concat('%', #{keyword}, '%')
+                  )
+                </if>
+                group by concat(coalesce(table_title, '默认表'), '|', coalesce(column_key, coalesce(column_path, column_leaf, '')))
+                order by item_key
+            </when>
+            <otherwise>
+                select
+                    'cell' as level,
+                    concat(coalesce(table_title, '默认表'), '|', coalesce(row_key, coalesce(row_path, '')), '|', coalesce(column_key, coalesce(column_path, ''))) as item_key,
+                    max(note_no) as note_no,
+                    max(case when side = 'PDF' then concat(coalesce(table_title, '默认表'), ' / 单元格') end) as pdf_title,
+                    max(case when side = 'PDF' then concat('行：', coalesce(nullif(row_path, ''), row_key, '未命名行'), '；列：', coalesce(nullif(column_path, ''), column_key, '未命名列'), '；值：', coalesce(nullif(value_text, ''), normalized_value, '空值')) end) as pdf_detail,
+                    max(case when side = 'PDF' then source_locator end) as pdf_locator,
+                    max(case when side = 'EXCEL' then concat(coalesce(table_title, '默认表'), ' / 单元格') end) as excel_title,
+                    max(case when side = 'EXCEL' then concat('行：', coalesce(nullif(row_path, ''), row_key, '未命名行'), '；列：', coalesce(nullif(column_path, ''), column_key, '未命名列'), '；值：', coalesce(nullif(value_text, ''), normalized_value, '空值')) end) as excel_detail,
+                    max(case when side = 'EXCEL' then source_locator end) as excel_locator,
+                    false as runtime_recognized,
+                    'MISSING' as runtime_status,
+                    null as runtime_title,
+                    '当前还没有导入 runtime 结构，先按未识别展示' as runtime_detail,
+                    null as runtime_locator
+                from structure_cell
+                where project_id = #{projectId}
+                  and note_no = #{noteNo}
+                <if test="keyword != null and keyword != ''">
+                  and (
+                    table_title like concat('%', #{keyword}, '%')
+                    or row_key like concat('%', #{keyword}, '%')
+                    or row_path like concat('%', #{keyword}, '%')
+                    or column_key like concat('%', #{keyword}, '%')
+                    or column_path like concat('%', #{keyword}, '%')
+                    or value_text like concat('%', #{keyword}, '%')
+                    or normalized_value like concat('%', #{keyword}, '%')
+                    or source_locator like concat('%', #{keyword}, '%')
+                  )
+                </if>
+                group by concat(coalesce(table_title, '默认表'), '|', coalesce(row_key, coalesce(row_path, '')), '|', coalesce(column_key, coalesce(column_path, '')))
+                order by item_key
+            </otherwise>
+        </choose>
+    </select>
+</mapper>

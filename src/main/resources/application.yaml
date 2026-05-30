@@ -24,6 +24,11 @@ mybatis:
     map-underscore-to-camel-case: true
     jdbc-type-for-null: 'NULL'
 
+pagehelper:
+  helper-dialect: mysql
+  reasonable: true
+  support-methods-arguments: true
+
 logging:
   level:
     com.jzyz.gtreviewassistant: info

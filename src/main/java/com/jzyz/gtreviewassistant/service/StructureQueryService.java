@@ -4,17 +4,22 @@ import com.jzyz.gtreviewassistant.common.Side;
 import com.jzyz.gtreviewassistant.common.TextKeys;
 import com.jzyz.gtreviewassistant.domain.dto.NoteDetail;
 import com.jzyz.gtreviewassistant.domain.dto.NoteSummary;
+import com.jzyz.gtreviewassistant.domain.dto.PageResult;
+import com.jzyz.gtreviewassistant.domain.dto.StructureCoverageItem;
 import com.jzyz.gtreviewassistant.domain.dto.StructureOverview;
 import com.jzyz.gtreviewassistant.domain.dto.TableView;
 import com.jzyz.gtreviewassistant.domain.entity.StructureDiff;
 import com.jzyz.gtreviewassistant.domain.entity.StructureNote;
 import com.jzyz.gtreviewassistant.domain.entity.StructureTable;
+import com.jzyz.gtreviewassistant.mapper.StructureCoverageMapper;
 import com.jzyz.gtreviewassistant.mapper.StructureCellMapper;
 import com.jzyz.gtreviewassistant.mapper.StructureColumnMapper;
 import com.jzyz.gtreviewassistant.mapper.StructureDiffMapper;
 import com.jzyz.gtreviewassistant.mapper.StructureNoteMapper;
 import com.jzyz.gtreviewassistant.mapper.StructureRowMapper;
 import com.jzyz.gtreviewassistant.mapper.StructureTableMapper;
+import com.github.pagehelper.PageHelper;
+import com.github.pagehelper.PageInfo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -37,6 +42,7 @@ public class StructureQueryService {
     private final StructureColumnMapper columnMapper;
     private final StructureCellMapper cellMapper;
     private final StructureDiffMapper diffMapper;
+    private final StructureCoverageMapper coverageMapper;
 
     public StructureOverview overview(Long projectId) {
         projectService.getRequired(projectId);
@@ -121,6 +127,39 @@ public class StructureQueryService {
     public List<StructureDiff> diffs(Long projectId, String noteNo, String diffLevel) {
         projectService.getRequired(projectId);
         return diffMapper.selectByProject(projectId, noteNo, diffLevel);
+    }
+
+    public PageResult<StructureCoverageItem> coverageItems(Long projectId,
+                                                           String noteNo,
+                                                           String level,
+                                                           String keyword,
+                                                           int pageNum,
+                                                           int pageSize) {
+        projectService.getRequired(projectId);
+        String safeLevel = normalizeLevel(level);
+        int safePageNum = Math.max(pageNum, 1);
+        int safePageSize = Math.min(Math.max(pageSize, 5), 100);
+        PageHelper.startPage(safePageNum, safePageSize);
+        List<StructureCoverageItem> items = coverageMapper.selectCoverageItems(projectId, noteNo, safeLevel, TextKeys.clean(keyword));
+        PageInfo<StructureCoverageItem> pageInfo = new PageInfo<>(items);
+        return new PageResult<>(
+                pageInfo.getPageNum(),
+                pageInfo.getPageSize(),
+                pageInfo.getTotal(),
+                pageInfo.getPages(),
+                pageInfo.getList()
+        );
+    }
+
+    private String normalizeLevel(String level) {
+        String cleaned = TextKeys.clean(level);
+        if (cleaned.isEmpty()) {
+            return "cell";
+        }
+        if (!List.of("cell", "row", "column").contains(cleaned)) {
+            throw new IllegalArgumentException("level 只能是 cell、row 或 column");
+        }
+        return cleaned;
     }
 
     private List<TableView> buildTables(Long projectId, String noteNo, String side) {
