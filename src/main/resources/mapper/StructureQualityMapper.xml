@@ -1,0 +1,373 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.jzyz.gtreviewassistant.mapper.StructureQualityMapper">
+    <sql id="qualityFilters">
+        <if test="noteNo != null and noteNo != ''">
+            and q.note_no = #{noteNo}
+        </if>
+        <if test="severity != null and severity != ''">
+            and q.severity = #{severity}
+        </if>
+        <if test="issueType != null and issueType != ''">
+            and q.issue_type = #{issueType}
+        </if>
+        <if test="side != null and side != ''">
+            and q.side = #{side}
+        </if>
+        <if test="decision != null and decision == 'UNDECIDED'">
+            and d.decision is null
+        </if>
+        <if test="decision != null and decision != '' and decision != 'UNDECIDED'">
+            and d.decision = #{decision}
+        </if>
+    </sql>
+
+    <select id="selectIssues" resultType="com.jzyz.gtreviewassistant.domain.dto.StructureQualityIssue">
+        select
+            q.*,
+            d.decision as decision,
+            d.comment as decision_comment,
+            d.reviewer as reviewer,
+            d.reviewed_at as reviewed_at,
+            d.updated_at as decision_updated_at
+        from (
+            select
+                concat('TABLE_NO_ROWS:', t.id) as issue_key,
+                'TABLE_NO_ROWS' as issue_type,
+                'HIGH' as severity,
+                t.side as side,
+                t.note_no as note_no,
+                n.note_name as note_name,
+                t.id as table_id,
+                t.table_title as table_title,
+                'table' as level,
+                t.id as ref_id,
+                coalesce(nullif(t.table_title, ''), '未命名表') as ref_text,
+                1 as expected_count,
+                0 as actual_count,
+                concat('表没有识别出任何行：', coalesce(nullif(t.table_title, ''), '未命名表')) as message,
+                '优先打开原始 PDF/Excel 核对：这张表是否真的没有行；如果有行，说明原文件结构解析漏掉了行轴。' as suggestion,
+                t.source_locator as locator
+            from structure_table t
+            left join structure_note n
+              on n.project_id = t.project_id and n.side = t.side and n.note_no = t.note_no
+            left join (
+                select table_id, count(*) as row_count
+                from structure_row
+                where project_id = #{projectId}
+                group by table_id
+            ) r on r.table_id = t.id
+            where t.project_id = #{projectId}
+              and coalesce(r.row_count, 0) = 0
+
+            union all
+
+            select
+                concat('TABLE_NO_COLUMNS:', t.id) as issue_key,
+                'TABLE_NO_COLUMNS' as issue_type,
+                'HIGH' as severity,
+                t.side as side,
+                t.note_no as note_no,
+                n.note_name as note_name,
+                t.id as table_id,
+                t.table_title as table_title,
+                'table' as level,
+                t.id as ref_id,
+                coalesce(nullif(t.table_title, ''), '未命名表') as ref_text,
+                1 as expected_count,
+                0 as actual_count,
+                concat('表没有识别出任何列：', coalesce(nullif(t.table_title, ''), '未命名表')) as message,
+                '优先打开原始 PDF/Excel 核对：这张表是否真的没有列；如果有列，说明原文件结构解析漏掉了列轴。' as suggestion,
+                t.source_locator as locator
+            from structure_table t
+            left join structure_note n
+              on n.project_id = t.project_id and n.side = t.side and n.note_no = t.note_no
+            left join (
+                select table_id, count(*) as column_count
+                from structure_column
+                where project_id = #{projectId}
+                group by table_id
+            ) c on c.table_id = t.id
+            where t.project_id = #{projectId}
+              and coalesce(c.column_count, 0) = 0
+
+            union all
+
+            select
+                concat('TABLE_NO_CELLS:', t.id) as issue_key,
+                'TABLE_NO_CELLS' as issue_type,
+                'HIGH' as severity,
+                t.side as side,
+                t.note_no as note_no,
+                n.note_name as note_name,
+                t.id as table_id,
+                t.table_title as table_title,
+                'table' as level,
+                t.id as ref_id,
+                coalesce(nullif(t.table_title, ''), '未命名表') as ref_text,
+                1 as expected_count,
+                0 as actual_count,
+                concat('表有标题但没有识别出任何单元格：', coalesce(nullif(t.table_title, ''), '未命名表')) as message,
+                '如果原表实际有数据，这通常说明表格区域、黄标区域或单元格抽取失败；需要先修正原文件结构识别结果。' as suggestion,
+                t.source_locator as locator
+            from structure_table t
+            left join structure_note n
+              on n.project_id = t.project_id and n.side = t.side and n.note_no = t.note_no
+            left join (
+                select table_id, count(*) as cell_count
+                from structure_cell
+                where project_id = #{projectId}
+                group by table_id
+            ) cell on cell.table_id = t.id
+            where t.project_id = #{projectId}
+              and coalesce(cell.cell_count, 0) = 0
+
+            union all
+
+            select
+                concat('CELL_COUNT_MISMATCH:', s.table_id) as issue_key,
+                'CELL_COUNT_MISMATCH' as issue_type,
+                case when s.cell_count &lt; s.row_count * s.column_count then 'HIGH' else 'MEDIUM' end as severity,
+                s.side as side,
+                s.note_no as note_no,
+                n.note_name as note_name,
+                s.table_id as table_id,
+                s.table_title as table_title,
+                'table' as level,
+                s.table_id as ref_id,
+                coalesce(nullif(s.table_title, ''), '未命名表') as ref_text,
+                s.row_count * s.column_count as expected_count,
+                s.cell_count as actual_count,
+                concat(
+                    '表的行列组合数和单元格数不一致：预计 ',
+                    s.row_count * s.column_count,
+                    ' 个，实际 ',
+                    s.cell_count,
+                    ' 个。'
+                ) as message,
+                '先核对这张表的行轴、列轴是否被拆错；如果行列轴正确，再核对是否漏识别或重复识别了单元格。' as suggestion,
+                s.source_locator as locator
+            from (
+                select
+                    t.id as table_id,
+                    t.project_id,
+                    t.side,
+                    t.note_no,
+                    t.table_title,
+                    t.source_locator,
+                    coalesce(r.row_count, 0) as row_count,
+                    coalesce(c.column_count, 0) as column_count,
+                    coalesce(cell.cell_count, 0) as cell_count
+                from structure_table t
+                left join (
+                    select table_id, count(*) as row_count
+                    from structure_row
+                    where project_id = #{projectId}
+                    group by table_id
+                ) r on r.table_id = t.id
+                left join (
+                    select table_id, count(*) as column_count
+                    from structure_column
+                    where project_id = #{projectId}
+                    group by table_id
+                ) c on c.table_id = t.id
+                left join (
+                    select table_id, count(*) as cell_count
+                    from structure_cell
+                    where project_id = #{projectId}
+                    group by table_id
+                ) cell on cell.table_id = t.id
+                where t.project_id = #{projectId}
+            ) s
+            left join structure_note n
+              on n.project_id = s.project_id and n.side = s.side and n.note_no = s.note_no
+            where s.row_count > 0
+              and s.column_count > 0
+              and s.cell_count != s.row_count * s.column_count
+
+            union all
+
+            select
+                concat('EMPTY_ROW_KEY:', r.id) as issue_key,
+                'EMPTY_ROW_KEY' as issue_type,
+                'HIGH' as severity,
+                r.side as side,
+                r.note_no as note_no,
+                n.note_name as note_name,
+                r.table_id as table_id,
+                r.table_title as table_title,
+                'row' as level,
+                r.id as ref_id,
+                coalesce(nullif(r.row_path, ''), nullif(r.row_leaf, ''), '空行名') as ref_text,
+                1 as expected_count,
+                0 as actual_count,
+                concat('行没有可用于匹配的 row_key：', coalesce(nullif(r.row_path, ''), nullif(r.row_leaf, ''), '空行名')) as message,
+                'row_key 为空会影响 PDF/Excel 对齐和 runtime 覆盖判断；需要核对这行是否是空行、层级标题，还是解析漏了行名。' as suggestion,
+                r.source_locator as locator
+            from structure_row r
+            left join structure_note n
+              on n.project_id = r.project_id and n.side = r.side and n.note_no = r.note_no
+            where r.project_id = #{projectId}
+              and trim(coalesce(r.row_key, '')) = ''
+
+            union all
+
+            select
+                concat('EMPTY_COLUMN_KEY:', c.id) as issue_key,
+                'EMPTY_COLUMN_KEY' as issue_type,
+                'HIGH' as severity,
+                c.side as side,
+                c.note_no as note_no,
+                n.note_name as note_name,
+                c.table_id as table_id,
+                c.table_title as table_title,
+                'column' as level,
+                c.id as ref_id,
+                coalesce(nullif(c.column_path, ''), nullif(c.column_leaf, ''), '空列名') as ref_text,
+                1 as expected_count,
+                0 as actual_count,
+                concat('列没有可用于匹配的 column_key：', coalesce(nullif(c.column_path, ''), nullif(c.column_leaf, ''), '空列名')) as message,
+                'column_key 为空会影响 PDF/Excel 对齐和 runtime 覆盖判断；需要核对这列是否是空列、合并表头，还是解析漏了列名。' as suggestion,
+                c.source_locator as locator
+            from structure_column c
+            left join structure_note n
+              on n.project_id = c.project_id and n.side = c.side and n.note_no = c.note_no
+            where c.project_id = #{projectId}
+              and trim(coalesce(c.column_key, '')) = ''
+
+            union all
+
+            select
+                concat('CELL_WITHOUT_ROW_OR_COLUMN:', cell.id) as issue_key,
+                'CELL_WITHOUT_ROW_OR_COLUMN' as issue_type,
+                'HIGH' as severity,
+                cell.side as side,
+                cell.note_no as note_no,
+                n.note_name as note_name,
+                cell.table_id as table_id,
+                cell.table_title as table_title,
+                'cell' as level,
+                cell.id as ref_id,
+                concat(
+                    '行=',
+                    coalesce(nullif(cell.row_path, ''), nullif(cell.row_key, ''), '空'),
+                    '；列=',
+                    coalesce(nullif(cell.column_path, ''), nullif(cell.column_key, ''), '空'),
+                    '；值=',
+                    coalesce(nullif(cell.value_text, ''), nullif(cell.normalized_value, ''), '空')
+                ) as ref_text,
+                2 as expected_count,
+                case
+                    when trim(coalesce(cell.row_key, '')) = '' and trim(coalesce(cell.column_key, '')) = '' then 0
+                    else 1
+                end as actual_count,
+                concat(
+                    '单元格缺少行名或列名：行=',
+                    coalesce(nullif(cell.row_path, ''), nullif(cell.row_key, ''), '空'),
+                    '，列=',
+                    coalesce(nullif(cell.column_path, ''), nullif(cell.column_key, ''), '空')
+                ) as message,
+                '单元格必须能落到明确的行和列；否则它不能稳定生成结构GT，也不能稳定和 runtime 结果匹配。' as suggestion,
+                cell.source_locator as locator
+            from structure_cell cell
+            left join structure_note n
+              on n.project_id = cell.project_id and n.side = cell.side and n.note_no = cell.note_no
+            where cell.project_id = #{projectId}
+              and (trim(coalesce(cell.row_key, '')) = '' or trim(coalesce(cell.column_key, '')) = '')
+
+            union all
+
+            select
+                concat('EMPTY_LOCATOR:ROW:', r.id) as issue_key,
+                'EMPTY_LOCATOR' as issue_type,
+                'MEDIUM' as severity,
+                r.side as side,
+                r.note_no as note_no,
+                n.note_name as note_name,
+                r.table_id as table_id,
+                r.table_title as table_title,
+                'row' as level,
+                r.id as ref_id,
+                coalesce(nullif(r.row_path, ''), nullif(r.row_leaf, ''), nullif(r.row_key, ''), '空行名') as ref_text,
+                1 as expected_count,
+                0 as actual_count,
+                '行结构没有原文件定位。' as message,
+                '如果要把原文件结构作为结构GT，建议补齐定位，至少能回到 Excel sheet/单元格或 PDF 页码/区域。' as suggestion,
+                r.source_locator as locator
+            from structure_row r
+            left join structure_note n
+              on n.project_id = r.project_id and n.side = r.side and n.note_no = r.note_no
+            where r.project_id = #{projectId}
+              and trim(coalesce(r.source_locator, '')) = ''
+
+            union all
+
+            select
+                concat('EMPTY_LOCATOR:COLUMN:', c.id) as issue_key,
+                'EMPTY_LOCATOR' as issue_type,
+                'MEDIUM' as severity,
+                c.side as side,
+                c.note_no as note_no,
+                n.note_name as note_name,
+                c.table_id as table_id,
+                c.table_title as table_title,
+                'column' as level,
+                c.id as ref_id,
+                coalesce(nullif(c.column_path, ''), nullif(c.column_leaf, ''), nullif(c.column_key, ''), '空列名') as ref_text,
+                1 as expected_count,
+                0 as actual_count,
+                '列结构没有原文件定位。' as message,
+                '如果要把原文件结构作为结构GT，建议补齐定位，至少能回到 Excel sheet/单元格或 PDF 页码/区域。' as suggestion,
+                c.source_locator as locator
+            from structure_column c
+            left join structure_note n
+              on n.project_id = c.project_id and n.side = c.side and n.note_no = c.note_no
+            where c.project_id = #{projectId}
+              and trim(coalesce(c.source_locator, '')) = ''
+
+            union all
+
+            select
+                concat('EMPTY_LOCATOR:CELL:', cell.id) as issue_key,
+                'EMPTY_LOCATOR' as issue_type,
+                'LOW' as severity,
+                cell.side as side,
+                cell.note_no as note_no,
+                n.note_name as note_name,
+                cell.table_id as table_id,
+                cell.table_title as table_title,
+                'cell' as level,
+                cell.id as ref_id,
+                concat(
+                    '行=',
+                    coalesce(nullif(cell.row_path, ''), nullif(cell.row_key, ''), '空'),
+                    '；列=',
+                    coalesce(nullif(cell.column_path, ''), nullif(cell.column_key, ''), '空'),
+                    '；值=',
+                    coalesce(nullif(cell.value_text, ''), nullif(cell.normalized_value, ''), '空')
+                ) as ref_text,
+                1 as expected_count,
+                0 as actual_count,
+                '单元格没有原文件定位。' as message,
+                '低优先级：如果行列和值都明确，可以先使用；冻结为结构GT前最好补齐定位证据。' as suggestion,
+                cell.source_locator as locator
+            from structure_cell cell
+            left join structure_note n
+              on n.project_id = cell.project_id and n.side = cell.side and n.note_no = cell.note_no
+            where cell.project_id = #{projectId}
+              and trim(coalesce(cell.source_locator, '')) = ''
+        ) q
+        left join structure_quality_decision d
+          on d.project_id = #{projectId} and d.issue_key = q.issue_key
+        where 1 = 1
+        <include refid="qualityFilters" />
+        order by
+            case q.severity when 'HIGH' then 1 when 'MEDIUM' then 2 else 3 end,
+            case when q.note_no regexp '^[0-9]+$' then cast(q.note_no as unsigned) else 999999 end,
+            q.note_no,
+            q.side,
+            q.table_id,
+            case q.level when 'table' then 1 when 'row' then 2 when 'column' then 3 else 4 end,
+            q.ref_id
+    </select>
+</mapper>

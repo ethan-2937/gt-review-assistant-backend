@@ -6,9 +6,12 @@ import com.jzyz.gtreviewassistant.domain.dto.NoteDetail;
 import com.jzyz.gtreviewassistant.domain.dto.NoteSummary;
 import com.jzyz.gtreviewassistant.domain.dto.PageResult;
 import com.jzyz.gtreviewassistant.domain.dto.StructureCoverageItem;
+import com.jzyz.gtreviewassistant.domain.dto.StructureQualityDecisionRequest;
 import com.jzyz.gtreviewassistant.domain.dto.StructureOverview;
+import com.jzyz.gtreviewassistant.domain.dto.StructureQualityIssue;
 import com.jzyz.gtreviewassistant.domain.dto.TableView;
 import com.jzyz.gtreviewassistant.domain.entity.StructureDiff;
+import com.jzyz.gtreviewassistant.domain.entity.StructureQualityDecision;
 import com.jzyz.gtreviewassistant.domain.entity.StructureNote;
 import com.jzyz.gtreviewassistant.domain.entity.StructureTable;
 import com.jzyz.gtreviewassistant.mapper.StructureCoverageMapper;
@@ -16,18 +19,23 @@ import com.jzyz.gtreviewassistant.mapper.StructureCellMapper;
 import com.jzyz.gtreviewassistant.mapper.StructureColumnMapper;
 import com.jzyz.gtreviewassistant.mapper.StructureDiffMapper;
 import com.jzyz.gtreviewassistant.mapper.StructureNoteMapper;
+import com.jzyz.gtreviewassistant.mapper.StructureQualityDecisionMapper;
+import com.jzyz.gtreviewassistant.mapper.StructureQualityMapper;
 import com.jzyz.gtreviewassistant.mapper.StructureRowMapper;
 import com.jzyz.gtreviewassistant.mapper.StructureTableMapper;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -43,6 +51,8 @@ public class StructureQueryService {
     private final StructureCellMapper cellMapper;
     private final StructureDiffMapper diffMapper;
     private final StructureCoverageMapper coverageMapper;
+    private final StructureQualityMapper qualityMapper;
+    private final StructureQualityDecisionMapper qualityDecisionMapper;
     private final RuntimeRunService runtimeRunService;
 
     public StructureOverview overview(Long projectId) {
@@ -158,10 +168,63 @@ public class StructureQueryService {
         );
     }
 
+    public PageResult<StructureQualityIssue> qualityIssues(Long projectId,
+                                                           String noteNo,
+                                                           String severity,
+                                                           String issueType,
+                                                           String side,
+                                                           String decision,
+                                                           int pageNum,
+                                                           int pageSize) {
+        projectService.getRequired(projectId);
+        String safeNoteNo = TextKeys.clean(noteNo);
+        String safeSeverity = normalizeOptionalUpper(severity, List.of("HIGH", "MEDIUM", "LOW"), "severity");
+        String safeIssueType = normalizeIssueType(issueType);
+        String safeSide = normalizeOptionalSide(side);
+        String safeDecision = normalizeDecisionFilter(decision);
+        int safePageNum = Math.max(pageNum, 1);
+        int safePageSize = Math.min(Math.max(pageSize, 5), 100);
+        PageHelper.startPage(safePageNum, safePageSize);
+        List<StructureQualityIssue> issues = qualityMapper.selectIssues(projectId, safeNoteNo, safeSeverity, safeIssueType, safeSide, safeDecision);
+        PageInfo<StructureQualityIssue> pageInfo = new PageInfo<>(issues);
+        return new PageResult<>(
+                pageInfo.getPageNum(),
+                pageInfo.getPageSize(),
+                pageInfo.getTotal(),
+                pageInfo.getPages(),
+                pageInfo.getList()
+        );
+    }
+
+    @Transactional
+    public StructureQualityDecision saveQualityDecision(Long projectId, StructureQualityDecisionRequest request) {
+        projectService.getRequired(projectId);
+        LocalDateTime now = LocalDateTime.now();
+        StructureQualityDecision decision = new StructureQualityDecision();
+        decision.setProjectId(projectId);
+        decision.setIssueKey(TextKeys.clean(request.getIssueKey()));
+        decision.setIssueType(normalizeIssueType(request.getIssueType()));
+        decision.setSeverity(normalizeOptionalUpper(request.getSeverity(), List.of("HIGH", "MEDIUM", "LOW"), "severity"));
+        decision.setSide(normalizeOptionalSide(request.getSide()));
+        decision.setNoteNo(TextKeys.clean(request.getNoteNo()));
+        decision.setTableId(request.getTableId());
+        decision.setTableTitle(TextKeys.clean(request.getTableTitle()));
+        decision.setLevel(TextKeys.clean(request.getLevel()));
+        decision.setRefId(request.getRefId());
+        decision.setDecision(normalizeDecision(request.getDecision()));
+        decision.setComment(TextKeys.clean(request.getComment()));
+        decision.setReviewer(TextKeys.firstNonBlank(request.getReviewer(), "local-user"));
+        decision.setReviewedAt(now);
+        decision.setCreatedAt(now);
+        decision.setUpdatedAt(now);
+        qualityDecisionMapper.upsert(decision);
+        return qualityDecisionMapper.selectByProjectAndIssueKey(projectId, decision.getIssueKey());
+    }
+
     private String normalizeLevel(String level) {
         String cleaned = TextKeys.clean(level);
         if (cleaned.isEmpty()) {
-            return "cell";
+            return "row";
         }
         if (!List.of("cell", "row", "column").contains(cleaned)) {
             throw new IllegalArgumentException("level 只能是 cell、row 或 column");
@@ -179,6 +242,60 @@ public class StructureQueryService {
             throw new IllegalArgumentException("matchStatus 只能是 all、matched 或 missing");
         }
         return lower;
+    }
+
+    private String normalizeOptionalSide(String side) {
+        String cleaned = TextKeys.clean(side);
+        if (cleaned.isEmpty() || "all".equalsIgnoreCase(cleaned)) {
+            return "";
+        }
+        return Side.normalize(cleaned);
+    }
+
+    private String normalizeOptionalUpper(String value, List<String> allowed, String fieldName) {
+        String cleaned = TextKeys.clean(value);
+        if (cleaned.isEmpty() || "all".equalsIgnoreCase(cleaned)) {
+            return "";
+        }
+        String upper = cleaned.toUpperCase(Locale.ROOT);
+        if (!allowed.contains(upper)) {
+            throw new IllegalArgumentException(fieldName + " 参数不合法");
+        }
+        return upper;
+    }
+
+    private String normalizeIssueType(String issueType) {
+        String cleaned = TextKeys.clean(issueType);
+        if (cleaned.isEmpty() || "all".equalsIgnoreCase(cleaned)) {
+            return "";
+        }
+        return cleaned.toUpperCase(Locale.ROOT);
+    }
+
+    private String normalizeDecision(String decision) {
+        String cleaned = TextKeys.clean(decision).toUpperCase(Locale.ROOT);
+        List<String> allowed = List.of(
+                "STRUCTURE_GT_READY",
+                "STRUCTURE_GT_EXCLUDED",
+                "PARSER_ERROR",
+                "FALSE_ALARM",
+                "PENDING"
+        );
+        if (!allowed.contains(cleaned)) {
+            throw new IllegalArgumentException("decision 参数不合法");
+        }
+        return cleaned;
+    }
+
+    private String normalizeDecisionFilter(String decision) {
+        String cleaned = TextKeys.clean(decision).toUpperCase(Locale.ROOT);
+        if (cleaned.isEmpty() || "ALL".equals(cleaned)) {
+            return "";
+        }
+        if ("UNDECIDED".equals(cleaned)) {
+            return cleaned;
+        }
+        return normalizeDecision(cleaned);
     }
 
     private List<TableView> buildTables(Long projectId, String noteNo, String side) {

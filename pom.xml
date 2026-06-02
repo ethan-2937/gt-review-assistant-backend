@@ -11,7 +11,7 @@
 
     <groupId>com.jzyz</groupId>
     <artifactId>gt-review-assistant</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>gt-review-assistant</name>
     <description>GT review assistant backend</description>
 

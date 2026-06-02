@@ -6,9 +6,12 @@ import com.jzyz.gtreviewassistant.domain.dto.NoteDetail;
 import com.jzyz.gtreviewassistant.domain.dto.NoteSummary;
 import com.jzyz.gtreviewassistant.domain.dto.PageResult;
 import com.jzyz.gtreviewassistant.domain.dto.StructureCoverageItem;
+import com.jzyz.gtreviewassistant.domain.dto.StructureQualityDecisionRequest;
 import com.jzyz.gtreviewassistant.domain.dto.StructureImportRequest;
 import com.jzyz.gtreviewassistant.domain.dto.StructureOverview;
+import com.jzyz.gtreviewassistant.domain.dto.StructureQualityIssue;
 import com.jzyz.gtreviewassistant.domain.entity.StructureDiff;
+import com.jzyz.gtreviewassistant.domain.entity.StructureQualityDecision;
 import com.jzyz.gtreviewassistant.service.StructureCompareService;
 import com.jzyz.gtreviewassistant.service.StructureImportService;
 import com.jzyz.gtreviewassistant.service.StructureQueryService;
@@ -63,13 +66,31 @@ public class StructureController {
     @GetMapping("/notes/{noteNo}/coverage")
     public ApiResponse<PageResult<StructureCoverageItem>> coverageItems(@PathVariable Long projectId,
                                                                         @PathVariable String noteNo,
-                                                                        @RequestParam(defaultValue = "cell") String level,
+                                                                        @RequestParam(defaultValue = "row") String level,
                                                                         @RequestParam(required = false) String keyword,
                                                                         @RequestParam(required = false) Long runId,
                                                                         @RequestParam(required = false) String matchStatus,
                                                                         @RequestParam(defaultValue = "1") int pageNum,
                                                                         @RequestParam(defaultValue = "20") int pageSize) {
         return ApiResponse.ok(queryService.coverageItems(projectId, noteNo, level, keyword, runId, matchStatus, pageNum, pageSize));
+    }
+
+    @GetMapping("/quality/issues")
+    public ApiResponse<PageResult<StructureQualityIssue>> qualityIssues(@PathVariable Long projectId,
+                                                                        @RequestParam(required = false) String noteNo,
+                                                                        @RequestParam(required = false) String severity,
+                                                                        @RequestParam(required = false) String issueType,
+                                                                        @RequestParam(required = false) String side,
+                                                                        @RequestParam(required = false) String decision,
+                                                                        @RequestParam(defaultValue = "1") int pageNum,
+                                                                        @RequestParam(defaultValue = "20") int pageSize) {
+        return ApiResponse.ok(queryService.qualityIssues(projectId, noteNo, severity, issueType, side, decision, pageNum, pageSize));
+    }
+
+    @PostMapping("/quality/decisions")
+    public ApiResponse<StructureQualityDecision> saveQualityDecision(@PathVariable Long projectId,
+                                                                     @Valid @RequestBody StructureQualityDecisionRequest request) {
+        return ApiResponse.ok("结构GT 裁决已保存", queryService.saveQualityDecision(projectId, request));
     }
 
     @GetMapping("/diffs")

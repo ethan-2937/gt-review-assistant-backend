@@ -170,14 +170,14 @@ public class StructureCompareService {
                 insertDiff(projectId, noteNo, noteName, "cell", "only_in_excel", null, null, "cell", excelCell.getId(),
                         "PDF：没有这个数据格", "Excel：" + displayCell(excelCell),
                         "Excel 有这个数据格，PDF 没有：" + displayCell(excelCell),
-                        "先确认是否是同一张表、同一行、同一列；确认缺失后才进入 GT 候选。",
+                        "先确认是否是同一张表、同一行、同一列；确认缺失后才进入 结构GT候选。",
                         "OPEN");
                 count++;
             } else if (excelCell == null) {
                 insertDiff(projectId, noteNo, noteName, "cell", "only_in_pdf", "cell", pdfCell.getId(), null, null,
                         "PDF：" + displayCell(pdfCell), "Excel：没有这个数据格",
                         "PDF 有这个数据格，Excel 没有：" + displayCell(pdfCell),
-                        "先确认是否是同一张表、同一行、同一列；确认缺失后才进入 GT 候选。",
+                        "先确认是否是同一张表、同一行、同一列；确认缺失后才进入 结构GT候选。",
                         "OPEN");
                 count++;
             } else if (!Objects.equals(valueKey(pdfCell), valueKey(excelCell))) {
