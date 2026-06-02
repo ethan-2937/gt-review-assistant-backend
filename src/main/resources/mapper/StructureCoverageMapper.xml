@@ -1,103 +1,165 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.jzyz.gtreviewassistant.mapper.StructureCoverageMapper">
+    <sql id="runtimeSelectColumns">
+        <choose>
+            <when test="runId != null">
+                case when max(coalesce(r.runtime_match_count, 0)) > 0 then true else false end as runtime_recognized,
+                case when max(coalesce(r.runtime_match_count, 0)) > 0 then 'MATCHED' else 'MISSING_MATCH' end as runtime_status,
+                cast(max(coalesce(r.runtime_match_count, 0)) as signed) as runtime_match_count,
+                max(r.runtime_side) as runtime_side,
+                max(r.runtime_title) as runtime_title,
+                max(r.runtime_detail) as runtime_detail,
+                max(r.runtime_locator) as runtime_locator,
+                max(r.runtime_value_text) as runtime_value_text,
+                max(r.runtime_confidence_level) as runtime_confidence_level,
+                max(r.runtime_source_artifact) as runtime_source_artifact,
+                max(r.runtime_locator_method) as runtime_locator_method
+            </when>
+            <otherwise>
+                false as runtime_recognized,
+                'NO_RUNTIME' as runtime_status,
+                0 as runtime_match_count,
+                null as runtime_side,
+                null as runtime_title,
+                '??????? runtime ????????????' as runtime_detail,
+                null as runtime_locator,
+                null as runtime_value_text,
+                null as runtime_confidence_level,
+                null as runtime_source_artifact,
+                null as runtime_locator_method
+            </otherwise>
+        </choose>
+    </sql>
+
+    <sql id="runtimeJoin">
+        <if test="runId != null">
+            left join (
+                select
+                    item_key,
+                    count(*) as runtime_match_count,
+                    group_concat(distinct runtime_side order by runtime_side separator '/') as runtime_side,
+                    max(concat(coalesce(table_title, '???'), ' / runtime ', level)) as runtime_title,
+                    max(concat(
+                        '??', coalesce(nullif(row_label, ''), nullif(row_key, ''), nullif(row_path, ''), '????'),
+                        '???', coalesce(nullif(column_label, ''), nullif(column_key, ''), nullif(column_path, ''), '????'),
+                        '???', coalesce(nullif(value_text, ''), nullif(value_signature, ''), '??')
+                    )) as runtime_detail,
+                    max(coalesce(nullif(cell_coordinate, ''), nullif(source_locator, ''), nullif(locator_method, ''))) as runtime_locator,
+                    max(coalesce(nullif(value_text, ''), nullif(value_signature, ''))) as runtime_value_text,
+                    max(confidence_level) as runtime_confidence_level,
+                    max(source_artifact) as runtime_source_artifact,
+                    max(locator_method) as runtime_locator_method
+                from runtime_structure_item
+                where project_id = #{projectId}
+                  and run_id = #{runId}
+                  and note_no = #{noteNo}
+                  and level = #{level}
+                group by item_key
+            ) r on r.item_key = s.item_key
+        </if>
+    </sql>
+
+    <sql id="runtimeHaving">
+        <if test="runId != null and matchStatus == 'matched'">
+            having max(coalesce(r.runtime_match_count, 0)) > 0
+        </if>
+        <if test="runId != null and matchStatus == 'missing'">
+            having max(coalesce(r.runtime_match_count, 0)) = 0
+        </if>
+    </sql>
+
     <select id="selectCoverageItems" resultType="com.jzyz.gtreviewassistant.domain.dto.StructureCoverageItem">
         <choose>
             <when test="level == 'row'">
                 select
                     'row' as level,
-                    item_key as item_key,
-                    max(note_no) as note_no,
-                    max(case when side = 'PDF' then concat(coalesce(table_title, '默认表'), ' / 行') end) as pdf_title,
-                    max(case when side = 'PDF' then coalesce(nullif(row_path, ''), nullif(row_leaf, ''), row_key) end) as pdf_detail,
-                    max(case when side = 'PDF' then source_locator end) as pdf_locator,
-                    max(case when side = 'EXCEL' then concat(coalesce(table_title, '默认表'), ' / 行') end) as excel_title,
-                    max(case when side = 'EXCEL' then coalesce(nullif(row_path, ''), nullif(row_leaf, ''), row_key) end) as excel_detail,
-                    max(case when side = 'EXCEL' then source_locator end) as excel_locator,
-                    false as runtime_recognized,
-                    'MISSING' as runtime_status,
-                    null as runtime_title,
-                    '当前还没有导入 runtime 结构，先按未识别展示' as runtime_detail,
-                    null as runtime_locator
-                from structure_row
-                where project_id = #{projectId}
-                  and note_no = #{noteNo}
+                    s.item_key as item_key,
+                    max(s.note_no) as note_no,
+                    max(case when s.side = 'PDF' then concat(coalesce(s.table_title, '???'), ' / ?') end) as pdf_title,
+                    max(case when s.side = 'PDF' then coalesce(nullif(s.row_path, ''), nullif(s.row_leaf, ''), s.row_key) end) as pdf_detail,
+                    max(case when s.side = 'PDF' then s.source_locator end) as pdf_locator,
+                    max(case when s.side = 'EXCEL' then concat(coalesce(s.table_title, '???'), ' / ?') end) as excel_title,
+                    max(case when s.side = 'EXCEL' then coalesce(nullif(s.row_path, ''), nullif(s.row_leaf, ''), s.row_key) end) as excel_detail,
+                    max(case when s.side = 'EXCEL' then s.source_locator end) as excel_locator,
+                    <include refid="runtimeSelectColumns" />
+                from structure_row s
+                <include refid="runtimeJoin" />
+                where s.project_id = #{projectId}
+                  and s.note_no = #{noteNo}
                 <if test="keyword != null and keyword != ''">
                   and (
-                    table_title like concat('%', #{keyword}, '%')
-                    or row_key like concat('%', #{keyword}, '%')
-                    or row_path like concat('%', #{keyword}, '%')
-                    or row_leaf like concat('%', #{keyword}, '%')
-                    or source_locator like concat('%', #{keyword}, '%')
+                    s.table_title like concat('%', #{keyword}, '%')
+                    or s.row_key like concat('%', #{keyword}, '%')
+                    or s.row_path like concat('%', #{keyword}, '%')
+                    or s.row_leaf like concat('%', #{keyword}, '%')
+                    or s.source_locator like concat('%', #{keyword}, '%')
                   )
                 </if>
-                group by item_key
-                order by item_key
+                group by s.item_key
+                <include refid="runtimeHaving" />
+                order by s.item_key
             </when>
             <when test="level == 'column'">
                 select
                     'column' as level,
-                    item_key as item_key,
-                    max(note_no) as note_no,
-                    max(case when side = 'PDF' then concat(coalesce(table_title, '默认表'), ' / 列名') end) as pdf_title,
-                    max(case when side = 'PDF' then coalesce(nullif(column_path, ''), nullif(column_leaf, ''), column_key) end) as pdf_detail,
-                    max(case when side = 'PDF' then source_locator end) as pdf_locator,
-                    max(case when side = 'EXCEL' then concat(coalesce(table_title, '默认表'), ' / 列名') end) as excel_title,
-                    max(case when side = 'EXCEL' then coalesce(nullif(column_path, ''), nullif(column_leaf, ''), column_key) end) as excel_detail,
-                    max(case when side = 'EXCEL' then source_locator end) as excel_locator,
-                    false as runtime_recognized,
-                    'MISSING' as runtime_status,
-                    null as runtime_title,
-                    '当前还没有导入 runtime 结构，先按未识别展示' as runtime_detail,
-                    null as runtime_locator
-                from structure_column
-                where project_id = #{projectId}
-                  and note_no = #{noteNo}
+                    s.item_key as item_key,
+                    max(s.note_no) as note_no,
+                    max(case when s.side = 'PDF' then concat(coalesce(s.table_title, '???'), ' / ??') end) as pdf_title,
+                    max(case when s.side = 'PDF' then coalesce(nullif(s.column_path, ''), nullif(s.column_leaf, ''), s.column_key) end) as pdf_detail,
+                    max(case when s.side = 'PDF' then s.source_locator end) as pdf_locator,
+                    max(case when s.side = 'EXCEL' then concat(coalesce(s.table_title, '???'), ' / ??') end) as excel_title,
+                    max(case when s.side = 'EXCEL' then coalesce(nullif(s.column_path, ''), nullif(s.column_leaf, ''), s.column_key) end) as excel_detail,
+                    max(case when s.side = 'EXCEL' then s.source_locator end) as excel_locator,
+                    <include refid="runtimeSelectColumns" />
+                from structure_column s
+                <include refid="runtimeJoin" />
+                where s.project_id = #{projectId}
+                  and s.note_no = #{noteNo}
                 <if test="keyword != null and keyword != ''">
                   and (
-                    table_title like concat('%', #{keyword}, '%')
-                    or column_key like concat('%', #{keyword}, '%')
-                    or column_path like concat('%', #{keyword}, '%')
-                    or column_leaf like concat('%', #{keyword}, '%')
-                    or source_locator like concat('%', #{keyword}, '%')
+                    s.table_title like concat('%', #{keyword}, '%')
+                    or s.column_key like concat('%', #{keyword}, '%')
+                    or s.column_path like concat('%', #{keyword}, '%')
+                    or s.column_leaf like concat('%', #{keyword}, '%')
+                    or s.source_locator like concat('%', #{keyword}, '%')
                   )
                 </if>
-                group by item_key
-                order by item_key
+                group by s.item_key
+                <include refid="runtimeHaving" />
+                order by s.item_key
             </when>
             <otherwise>
                 select
                     'cell' as level,
-                    item_key as item_key,
-                    max(note_no) as note_no,
-                    max(case when side = 'PDF' then concat(coalesce(table_title, '默认表'), ' / 单元格') end) as pdf_title,
-                    max(case when side = 'PDF' then concat('行：', coalesce(nullif(row_path, ''), row_key, '未命名行'), '；列：', coalesce(nullif(column_path, ''), column_key, '未命名列'), '；值：', coalesce(nullif(value_text, ''), normalized_value, '空值')) end) as pdf_detail,
-                    max(case when side = 'PDF' then source_locator end) as pdf_locator,
-                    max(case when side = 'EXCEL' then concat(coalesce(table_title, '默认表'), ' / 单元格') end) as excel_title,
-                    max(case when side = 'EXCEL' then concat('行：', coalesce(nullif(row_path, ''), row_key, '未命名行'), '；列：', coalesce(nullif(column_path, ''), column_key, '未命名列'), '；值：', coalesce(nullif(value_text, ''), normalized_value, '空值')) end) as excel_detail,
-                    max(case when side = 'EXCEL' then source_locator end) as excel_locator,
-                    false as runtime_recognized,
-                    'MISSING' as runtime_status,
-                    null as runtime_title,
-                    '当前还没有导入 runtime 结构，先按未识别展示' as runtime_detail,
-                    null as runtime_locator
-                from structure_cell
-                where project_id = #{projectId}
-                  and note_no = #{noteNo}
+                    s.item_key as item_key,
+                    max(s.note_no) as note_no,
+                    max(case when s.side = 'PDF' then concat(coalesce(s.table_title, '???'), ' / ???') end) as pdf_title,
+                    max(case when s.side = 'PDF' then concat('??', coalesce(nullif(s.row_path, ''), s.row_key, '????'), '???', coalesce(nullif(s.column_path, ''), s.column_key, '????'), '???', coalesce(nullif(s.value_text, ''), s.normalized_value, '??')) end) as pdf_detail,
+                    max(case when s.side = 'PDF' then s.source_locator end) as pdf_locator,
+                    max(case when s.side = 'EXCEL' then concat(coalesce(s.table_title, '???'), ' / ???') end) as excel_title,
+                    max(case when s.side = 'EXCEL' then concat('??', coalesce(nullif(s.row_path, ''), s.row_key, '????'), '???', coalesce(nullif(s.column_path, ''), s.column_key, '????'), '???', coalesce(nullif(s.value_text, ''), s.normalized_value, '??')) end) as excel_detail,
+                    max(case when s.side = 'EXCEL' then s.source_locator end) as excel_locator,
+                    <include refid="runtimeSelectColumns" />
+                from structure_cell s
+                <include refid="runtimeJoin" />
+                where s.project_id = #{projectId}
+                  and s.note_no = #{noteNo}
                 <if test="keyword != null and keyword != ''">
                   and (
-                    table_title like concat('%', #{keyword}, '%')
-                    or row_key like concat('%', #{keyword}, '%')
-                    or row_path like concat('%', #{keyword}, '%')
-                    or column_key like concat('%', #{keyword}, '%')
-                    or column_path like concat('%', #{keyword}, '%')
-                    or value_text like concat('%', #{keyword}, '%')
-                    or normalized_value like concat('%', #{keyword}, '%')
-                    or source_locator like concat('%', #{keyword}, '%')
+                    s.table_title like concat('%', #{keyword}, '%')
+                    or s.row_key like concat('%', #{keyword}, '%')
+                    or s.row_path like concat('%', #{keyword}, '%')
+                    or s.column_key like concat('%', #{keyword}, '%')
+                    or s.column_path like concat('%', #{keyword}, '%')
+                    or s.value_text like concat('%', #{keyword}, '%')
+                    or s.normalized_value like concat('%', #{keyword}, '%')
+                    or s.source_locator like concat('%', #{keyword}, '%')
                   )
                 </if>
-                group by item_key
-                order by item_key
+                group by s.item_key
+                <include refid="runtimeHaving" />
+                order by s.item_key
             </otherwise>
         </choose>
     </select>

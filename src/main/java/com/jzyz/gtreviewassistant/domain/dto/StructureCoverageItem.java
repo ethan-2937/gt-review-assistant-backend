@@ -18,7 +18,13 @@ public class StructureCoverageItem {
 
     private Boolean runtimeRecognized;
     private String runtimeStatus;
+    private Integer runtimeMatchCount;
+    private String runtimeSide;
     private String runtimeTitle;
     private String runtimeDetail;
     private String runtimeLocator;
+    private String runtimeValueText;
+    private String runtimeConfidenceLevel;
+    private String runtimeSourceArtifact;
+    private String runtimeLocatorMethod;
 }

@@ -43,6 +43,7 @@ public class StructureQueryService {
     private final StructureCellMapper cellMapper;
     private final StructureDiffMapper diffMapper;
     private final StructureCoverageMapper coverageMapper;
+    private final RuntimeRunService runtimeRunService;
 
     public StructureOverview overview(Long projectId) {
         projectService.getRequired(projectId);
@@ -133,14 +134,20 @@ public class StructureQueryService {
                                                            String noteNo,
                                                            String level,
                                                            String keyword,
+                                                           Long runId,
+                                                           String matchStatus,
                                                            int pageNum,
                                                            int pageSize) {
         projectService.getRequired(projectId);
+        if (runId != null) {
+            runtimeRunService.getRequired(projectId, runId);
+        }
         String safeLevel = normalizeLevel(level);
+        String safeMatchStatus = normalizeMatchStatus(matchStatus);
         int safePageNum = Math.max(pageNum, 1);
         int safePageSize = Math.min(Math.max(pageSize, 5), 100);
         PageHelper.startPage(safePageNum, safePageSize);
-        List<StructureCoverageItem> items = coverageMapper.selectCoverageItems(projectId, noteNo, safeLevel, TextKeys.clean(keyword));
+        List<StructureCoverageItem> items = coverageMapper.selectCoverageItems(projectId, noteNo, safeLevel, TextKeys.clean(keyword), runId, safeMatchStatus);
         PageInfo<StructureCoverageItem> pageInfo = new PageInfo<>(items);
         return new PageResult<>(
                 pageInfo.getPageNum(),
@@ -160,6 +167,18 @@ public class StructureQueryService {
             throw new IllegalArgumentException("level 只能是 cell、row 或 column");
         }
         return cleaned;
+    }
+
+    private String normalizeMatchStatus(String matchStatus) {
+        String cleaned = TextKeys.clean(matchStatus);
+        if (cleaned.isEmpty() || "all".equalsIgnoreCase(cleaned)) {
+            return "";
+        }
+        String lower = cleaned.toLowerCase();
+        if (!List.of("matched", "missing").contains(lower)) {
+            throw new IllegalArgumentException("matchStatus 只能是 all、matched 或 missing");
+        }
+        return lower;
     }
 
     private List<TableView> buildTables(Long projectId, String noteNo, String side) {

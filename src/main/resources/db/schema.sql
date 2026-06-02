@@ -1,4 +1,4 @@
-﻿create database if not exists `gt-review-assistant`
+create database if not exists `gt-review-assistant`
   default character set utf8mb4
   collate utf8mb4_unicode_ci;
 
@@ -144,3 +144,64 @@ create table if not exists structure_diff (
   key idx_diff_type (project_id, diff_type),
   key idx_diff_project_note_level (project_id, note_no, diff_level, id)
 ) engine=InnoDB default charset=utf8mb4;
+
+create table if not exists runtime_run (
+  id bigint primary key auto_increment,
+  project_id bigint not null,
+  run_key varchar(300) not null,
+  run_root varchar(1000),
+  run_type varchar(50),
+  run_status varchar(50),
+  dataset_key varchar(200),
+  version_label varchar(300),
+  case_count int,
+  artifact_completeness varchar(50),
+  confidence_level varchar(50),
+  source_host varchar(200),
+  source_sample_count int,
+  target_sample_count int,
+  source_structured_cell_count int,
+  target_structured_cell_count int,
+  table_count int,
+  created_at datetime not null,
+  updated_at datetime not null,
+  unique key uk_runtime_run_project_key (project_id, run_key),
+  key idx_runtime_run_project (project_id, updated_at, id)
+) engine=InnoDB default charset=utf8mb4;
+
+create table if not exists runtime_structure_item (
+  id bigint primary key auto_increment,
+  project_id bigint not null,
+  run_id bigint not null,
+  case_id varchar(50),
+  note_no varchar(50),
+  note_name varchar(300),
+  level varchar(50) not null,
+  runtime_side varchar(20),
+  item_key varchar(2000),
+  table_title varchar(500),
+  table_profile_id varchar(200),
+  row_key varchar(1000),
+  row_label varchar(500),
+  row_path text,
+  column_key varchar(1000),
+  column_label varchar(500),
+  column_path text,
+  value_text varchar(1000),
+  normalized_value varchar(1000),
+  value_signature varchar(1000),
+  value_type varchar(100),
+  source_locator varchar(500),
+  cell_coordinate varchar(200),
+  quote_text text,
+  source_artifact varchar(500),
+  source_json_path varchar(1000),
+  locator_method varchar(200),
+  confidence_level varchar(50),
+  raw_payload_json longtext,
+  created_at datetime not null,
+  key idx_runtime_item_run (run_id),
+  key idx_runtime_item_match (project_id, run_id, note_no, level, item_key(500)),
+  key idx_runtime_item_side (project_id, run_id, note_no, level, runtime_side)
+) engine=InnoDB default charset=utf8mb4;
+

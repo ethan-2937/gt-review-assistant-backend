@@ -65,9 +65,11 @@ public class StructureController {
                                                                         @PathVariable String noteNo,
                                                                         @RequestParam(defaultValue = "cell") String level,
                                                                         @RequestParam(required = false) String keyword,
+                                                                        @RequestParam(required = false) Long runId,
+                                                                        @RequestParam(required = false) String matchStatus,
                                                                         @RequestParam(defaultValue = "1") int pageNum,
                                                                         @RequestParam(defaultValue = "20") int pageSize) {
-        return ApiResponse.ok(queryService.coverageItems(projectId, noteNo, level, keyword, pageNum, pageSize));
+        return ApiResponse.ok(queryService.coverageItems(projectId, noteNo, level, keyword, runId, matchStatus, pageNum, pageSize));
     }
 
     @GetMapping("/diffs")

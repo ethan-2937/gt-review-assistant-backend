@@ -11,5 +11,7 @@ public interface StructureCoverageMapper {
     List<StructureCoverageItem> selectCoverageItems(@Param("projectId") Long projectId,
                                                     @Param("noteNo") String noteNo,
                                                     @Param("level") String level,
-                                                    @Param("keyword") String keyword);
+                                                    @Param("keyword") String keyword,
+                                                    @Param("runId") Long runId,
+                                                    @Param("matchStatus") String matchStatus);
 }

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.jzyz.gtreviewassistant.mapper.RuntimeRunMapper">
+    <insert id="insert" parameterType="RuntimeRun" useGeneratedKeys="true" keyProperty="id">
+        insert into runtime_run
+        (project_id, run_key, run_root, run_type, run_status, dataset_key, version_label, case_count,
+         artifact_completeness, confidence_level, source_host, source_sample_count, target_sample_count,
+         source_structured_cell_count, target_structured_cell_count, table_count, created_at, updated_at)
+        values
+        (#{projectId}, #{runKey}, #{runRoot}, #{runType}, #{runStatus}, #{datasetKey}, #{versionLabel}, #{caseCount},
+         #{artifactCompleteness}, #{confidenceLevel}, #{sourceHost}, #{sourceSampleCount}, #{targetSampleCount},
+         #{sourceStructuredCellCount}, #{targetStructuredCellCount}, #{tableCount}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <update id="update" parameterType="RuntimeRun">
+        update runtime_run
+        set run_root = #{runRoot},
+            run_type = #{runType},
+            run_status = #{runStatus},
+            dataset_key = #{datasetKey},
+            version_label = #{versionLabel},
+            case_count = #{caseCount},
+            artifact_completeness = #{artifactCompleteness},
+            confidence_level = #{confidenceLevel},
+            source_host = #{sourceHost},
+            source_sample_count = #{sourceSampleCount},
+            target_sample_count = #{targetSampleCount},
+            source_structured_cell_count = #{sourceStructuredCellCount},
+            target_structured_cell_count = #{targetStructuredCellCount},
+            table_count = #{tableCount},
+            updated_at = #{updatedAt}
+        where id = #{id}
+    </update>
+
+    <select id="selectById" resultType="RuntimeRun">
+        select * from runtime_run where id = #{id}
+    </select>
+
+    <select id="selectByProjectAndRunKey" resultType="RuntimeRun">
+        select * from runtime_run where project_id = #{projectId} and run_key = #{runKey}
+    </select>
+
+    <select id="selectByProject" resultType="RuntimeRun">
+        select * from runtime_run
+        where project_id = #{projectId}
+        order by updated_at desc, id desc
+    </select>
+</mapper>

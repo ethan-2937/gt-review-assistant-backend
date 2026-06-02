@@ -551,3 +551,62 @@ gt-review-assistant-worker
 ```
 
 长期再决定是否整理成 monorepo。
+## 14. Runtime sample 接入 MVP（2026-06-02）
+
+新增了 audit-engine 运行结果接入的第一版闭环。
+
+当前口径：
+
+```text
+只读取 audit-engine 运行结果文件，不改 audit-engine 主流程。
+worker 读取 runtime_eval.json / structure_qa.json。
+worker 调后端接口导入 runtime_run / runtime_structure_item。
+前端按 runId 展示“样例中找到了 / 样例中没找到”。
+```
+
+注意：当前接入的是 `runtime_eval.json` 中的：
+
+```text
+cases[*].debug_counts.direct_doc_materialization.clean_runtime_evidence.source_fact_samples
+cases[*].debug_counts.direct_doc_materialization.clean_runtime_evidence.target_fact_samples
+```
+
+这是 sample-only 数据，不代表完整 runtime 识别率。因此后端 `runtime_run.artifact_completeness` 标记为：
+
+```text
+SAMPLE_ONLY
+```
+
+后端新增：
+
+```text
+runtime_run
+runtime_structure_item
+POST /api/projects/{projectId}/runtime-runs/import
+GET  /api/projects/{projectId}/runtime-runs
+GET  /api/projects/{projectId}/structures/notes/{noteNo}/coverage?runId=...
+```
+
+worker 新增：
+
+```text
+import_audit_engine_runtime.py
+```
+
+示例：
+
+```powershell
+python import_audit_engine_runtime.py `
+  --run-root "D:\runtime\case23-resource-guard-textcache-smoke-20260512" `
+  --output-dir "D:\audit-engine\gt-review-assistant\workspace\runtime_import_case23" `
+  --backend "http://localhost:18081" `
+  --project-id 1
+```
+
+前端新增：
+
+- runtime run 下拉选择。
+- 根据 run 的完整性显示 sample 提示。
+- 分页接口传入 `runId` 和 `matchStatus`。
+- 支持筛选：全部、已匹配、未匹配。
+- sample-only run 显示“样例中找到了 / 样例中没找到”，避免误解为完整识别率。

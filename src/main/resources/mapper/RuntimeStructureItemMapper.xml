@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.jzyz.gtreviewassistant.mapper.RuntimeStructureItemMapper">
+    <insert id="insert" parameterType="RuntimeStructureItem" useGeneratedKeys="true" keyProperty="id">
+        insert into runtime_structure_item
+        (project_id, run_id, case_id, note_no, note_name, level, runtime_side, item_key, table_title,
+         table_profile_id, row_key, row_label, row_path, column_key, column_label, column_path, value_text,
+         normalized_value, value_signature, value_type, source_locator, cell_coordinate, quote_text,
+         source_artifact, source_json_path, locator_method, confidence_level, raw_payload_json, created_at)
+        values
+        (#{projectId}, #{runId}, #{caseId}, #{noteNo}, #{noteName}, #{level}, #{runtimeSide}, #{itemKey}, #{tableTitle},
+         #{tableProfileId}, #{rowKey}, #{rowLabel}, #{rowPath}, #{columnKey}, #{columnLabel}, #{columnPath}, #{valueText},
+         #{normalizedValue}, #{valueSignature}, #{valueType}, #{sourceLocator}, #{cellCoordinate}, #{quoteText},
+         #{sourceArtifact}, #{sourceJsonPath}, #{locatorMethod}, #{confidenceLevel}, #{rawPayloadJson}, #{createdAt})
+    </insert>
+
+    <delete id="deleteByRunId">
+        delete from runtime_structure_item where run_id = #{runId}
+    </delete>
+
+    <select id="countByRunId" resultType="int">
+        select count(*) from runtime_structure_item where run_id = #{runId}
+    </select>
+</mapper>
