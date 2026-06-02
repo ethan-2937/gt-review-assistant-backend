@@ -26,6 +26,9 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class StructureImportService {
+    private static final int ITEM_KEY_LIMIT = 2000;
+    private static final String DEFAULT_TABLE_KEY = "default table";
+
     private final ProjectService projectService;
     private final StructureNoteMapper noteMapper;
     private final StructureTableMapper tableMapper;
@@ -88,6 +91,7 @@ public class StructureImportService {
                     row.setRowPath(TextKeys.clean(rowPayload.getRowPath()));
                     row.setRowLeaf(TextKeys.firstNonBlank(rowPayload.getRowLeaf(), rowPayload.getRowPath()));
                     row.setRowKey(TextKeys.firstNonBlank(rowPayload.getRowKey(), TextKeys.key(row.getRowPath()), TextKeys.key(row.getRowLeaf())));
+                    row.setItemKey(rowItemKey(table.getTableTitle(), row.getRowKey(), row.getRowPath(), row.getRowLeaf()));
                     row.setRowOrder(rowPayload.getRowOrder() == null ? defaultRowOrder : rowPayload.getRowOrder());
                     row.setSourceLocator(rowPayload.getSourceLocator());
                     row.setCreatedAt(now);
@@ -110,6 +114,7 @@ public class StructureImportService {
                     column.setColumnPath(TextKeys.clean(columnPayload.getColumnPath()));
                     column.setColumnLeaf(TextKeys.firstNonBlank(columnPayload.getColumnLeaf(), columnPayload.getColumnPath()));
                     column.setColumnKey(TextKeys.firstNonBlank(columnPayload.getColumnKey(), TextKeys.key(column.getColumnPath()), TextKeys.key(column.getColumnLeaf())));
+                    column.setItemKey(columnItemKey(table.getTableTitle(), column.getColumnKey(), column.getColumnPath(), column.getColumnLeaf()));
                     column.setColumnOrder(columnPayload.getColumnOrder() == null ? defaultColumnOrder : columnPayload.getColumnOrder());
                     column.setSourceLocator(columnPayload.getSourceLocator());
                     column.setCreatedAt(now);
@@ -135,6 +140,7 @@ public class StructureImportService {
                     cell.setColumnKey(columnKey);
                     cell.setRowPath(TextKeys.clean(cellPayload.getRowPath()));
                     cell.setColumnPath(TextKeys.clean(cellPayload.getColumnPath()));
+                    cell.setItemKey(cellItemKey(table.getTableTitle(), cell.getRowKey(), cell.getRowPath(), cell.getColumnKey(), cell.getColumnPath()));
                     cell.setValueText(TextKeys.clean(cellPayload.getValueText()));
                     cell.setNormalizedValue(TextKeys.firstNonBlank(cellPayload.getNormalizedValue(), cellPayload.getValueText()));
                     cell.setSourceLocator(cellPayload.getSourceLocator());
@@ -157,5 +163,42 @@ public class StructureImportService {
         rowMapper.deleteByProjectAndSide(projectId, side);
         tableMapper.deleteByProjectAndSide(projectId, side);
         noteMapper.deleteByProjectAndSide(projectId, side);
+    }
+
+    private String rowItemKey(String tableTitle, String rowKey, String rowPath, String rowLeaf) {
+        return itemKey(tableTitleOrDefault(tableTitle), firstNonNull(rowKey, rowPath, rowLeaf, ""));
+    }
+
+    private String columnItemKey(String tableTitle, String columnKey, String columnPath, String columnLeaf) {
+        return itemKey(tableTitleOrDefault(tableTitle), firstNonNull(columnKey, columnPath, columnLeaf, ""));
+    }
+
+    private String cellItemKey(String tableTitle, String rowKey, String rowPath, String columnKey, String columnPath) {
+        return itemKey(
+                tableTitleOrDefault(tableTitle),
+                firstNonNull(rowKey, rowPath, ""),
+                firstNonNull(columnKey, columnPath, "")
+        );
+    }
+
+    private String itemKey(String... parts) {
+        String joined = String.join("|", parts);
+        return joined.length() <= ITEM_KEY_LIMIT ? joined : joined.substring(0, ITEM_KEY_LIMIT);
+    }
+
+    private String tableTitleOrDefault(String tableTitle) {
+        return tableTitle == null ? DEFAULT_TABLE_KEY : tableTitle;
+    }
+
+    private String firstNonNull(String... values) {
+        if (values == null) {
+            return "";
+        }
+        for (String value : values) {
+            if (value != null) {
+                return value;
+            }
+        }
+        return "";
     }
 }

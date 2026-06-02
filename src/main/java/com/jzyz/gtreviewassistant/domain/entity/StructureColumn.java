@@ -15,6 +15,7 @@ public class StructureColumn {
     private String columnKey;
     private String columnPath;
     private String columnLeaf;
+    private String itemKey;
     private Integer columnOrder;
     private String sourceLocator;
     private LocalDateTime createdAt;

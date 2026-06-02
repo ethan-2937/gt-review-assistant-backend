@@ -3,9 +3,9 @@
 <mapper namespace="com.jzyz.gtreviewassistant.mapper.StructureColumnMapper">
     <insert id="insert" parameterType="StructureColumn" useGeneratedKeys="true" keyProperty="id">
         insert into structure_column
-        (table_id, project_id, side, note_no, table_title, column_key, column_path, column_leaf, column_order, source_locator, created_at, updated_at)
+        (table_id, project_id, side, note_no, table_title, column_key, column_path, column_leaf, item_key, column_order, source_locator, created_at, updated_at)
         values
-        (#{tableId}, #{projectId}, #{side}, #{noteNo}, #{tableTitle}, #{columnKey}, #{columnPath}, #{columnLeaf}, #{columnOrder}, #{sourceLocator}, #{createdAt}, #{updatedAt})
+        (#{tableId}, #{projectId}, #{side}, #{noteNo}, #{tableTitle}, #{columnKey}, #{columnPath}, #{columnLeaf}, #{itemKey}, #{columnOrder}, #{sourceLocator}, #{createdAt}, #{updatedAt})
     </insert>
 
     <delete id="deleteByProjectAndSide">

@@ -15,6 +15,7 @@ public class StructureRow {
     private String rowKey;
     private String rowPath;
     private String rowLeaf;
+    private String itemKey;
     private Integer rowOrder;
     private String sourceLocator;
     private LocalDateTime createdAt;

@@ -43,7 +43,8 @@ create table if not exists structure_table (
   created_at datetime not null,
   updated_at datetime not null,
   key idx_table_note (project_id, side, note_no),
-  key idx_table_note_id (note_id)
+  key idx_table_note_id (note_id),
+  key idx_table_project_note_side_order (project_id, note_no, side, table_order, id)
 ) engine=InnoDB default charset=utf8mb4;
 
 create table if not exists structure_row (
@@ -56,13 +57,17 @@ create table if not exists structure_row (
   row_key varchar(1000),
   row_path text,
   row_leaf varchar(500),
+  item_key varchar(2000),
   row_order int,
   source_locator varchar(500),
   created_at datetime not null,
   updated_at datetime not null,
   key idx_row_table (table_id),
   key idx_row_note (project_id, side, note_no),
-  key idx_row_key (project_id, side, note_no, row_key(200))
+  key idx_row_key (project_id, side, note_no, row_key(200)),
+  key idx_row_project_note_side_order (project_id, note_no, side, table_title(120), row_order, id),
+  key idx_row_project_note_key (project_id, note_no, table_title(120), row_key(160)),
+  key idx_row_project_note_item_key (project_id, note_no, item_key(500))
 ) engine=InnoDB default charset=utf8mb4;
 
 create table if not exists structure_column (
@@ -75,13 +80,17 @@ create table if not exists structure_column (
   column_key varchar(1000),
   column_path text,
   column_leaf varchar(500),
+  item_key varchar(2000),
   column_order int,
   source_locator varchar(500),
   created_at datetime not null,
   updated_at datetime not null,
   key idx_col_table (table_id),
   key idx_col_note (project_id, side, note_no),
-  key idx_col_key (project_id, side, note_no, column_key(200))
+  key idx_col_key (project_id, side, note_no, column_key(200)),
+  key idx_col_project_note_side_order (project_id, note_no, side, table_title(120), column_order, id),
+  key idx_col_project_note_key (project_id, note_no, table_title(120), column_key(160)),
+  key idx_col_project_note_item_key (project_id, note_no, item_key(500))
 ) engine=InnoDB default charset=utf8mb4;
 
 create table if not exists structure_cell (
@@ -97,6 +106,7 @@ create table if not exists structure_cell (
   column_key varchar(1000),
   row_path text,
   column_path text,
+  item_key varchar(2000),
   value_text varchar(1000),
   normalized_value varchar(1000),
   source_locator varchar(500),
@@ -105,7 +115,10 @@ create table if not exists structure_cell (
   updated_at datetime not null,
   key idx_cell_table (table_id),
   key idx_cell_note (project_id, side, note_no),
-  key idx_cell_axis (project_id, side, note_no, row_key(160), column_key(160))
+  key idx_cell_axis (project_id, side, note_no, row_key(160), column_key(160)),
+  key idx_cell_project_note_side_axis (project_id, note_no, side, table_title(120), row_key(120), column_key(120), id),
+  key idx_cell_project_note_axis (project_id, note_no, table_title(120), row_key(120), column_key(120)),
+  key idx_cell_project_note_item_key (project_id, note_no, item_key(500))
 ) engine=InnoDB default charset=utf8mb4;
 
 create table if not exists structure_diff (
@@ -128,5 +141,6 @@ create table if not exists structure_diff (
   key idx_diff_project (project_id),
   key idx_diff_note (project_id, note_no),
   key idx_diff_level (project_id, diff_level),
-  key idx_diff_type (project_id, diff_type)
+  key idx_diff_type (project_id, diff_type),
+  key idx_diff_project_note_level (project_id, note_no, diff_level, id)
 ) engine=InnoDB default charset=utf8mb4;

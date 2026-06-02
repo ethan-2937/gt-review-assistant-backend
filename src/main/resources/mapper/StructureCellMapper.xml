@@ -4,10 +4,10 @@
     <insert id="insert" parameterType="StructureCell" useGeneratedKeys="true" keyProperty="id">
         insert into structure_cell
         (table_id, row_id, column_id, project_id, side, note_no, table_title, row_key, column_key, row_path, column_path,
-         value_text, normalized_value, source_locator, screenshot_path, created_at, updated_at)
+         item_key, value_text, normalized_value, source_locator, screenshot_path, created_at, updated_at)
         values
         (#{tableId}, #{rowId}, #{columnId}, #{projectId}, #{side}, #{noteNo}, #{tableTitle}, #{rowKey}, #{columnKey}, #{rowPath}, #{columnPath},
-         #{valueText}, #{normalizedValue}, #{sourceLocator}, #{screenshotPath}, #{createdAt}, #{updatedAt})
+         #{itemKey}, #{valueText}, #{normalizedValue}, #{sourceLocator}, #{screenshotPath}, #{createdAt}, #{updatedAt})
     </insert>
 
     <delete id="deleteByProjectAndSide">

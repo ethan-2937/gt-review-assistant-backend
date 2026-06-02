@@ -18,6 +18,7 @@ public class StructureCell {
     private String columnKey;
     private String rowPath;
     private String columnPath;
+    private String itemKey;
     private String valueText;
     private String normalizedValue;
     private String sourceLocator;
