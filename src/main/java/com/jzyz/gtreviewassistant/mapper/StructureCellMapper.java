@@ -12,6 +12,10 @@ public interface StructureCellMapper {
 
     int deleteByProjectAndSide(@Param("projectId") Long projectId, @Param("side") String side);
 
+    int deleteByProjectSideNote(@Param("projectId") Long projectId,
+                                @Param("side") String side,
+                                @Param("noteNo") String noteNo);
+
     List<StructureCell> selectByTableId(@Param("tableId") Long tableId);
 
     List<StructureCell> selectByProjectNoteSide(@Param("projectId") Long projectId,

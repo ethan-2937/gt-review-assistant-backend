@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.jzyz.gtreviewassistant.mapper.StructureGtDecisionMapper">
+    <insert id="upsert" parameterType="StructureGtDecision" useGeneratedKeys="true" keyProperty="id">
+        insert into structure_gt_decision
+        (project_id, decision_key, view_mode, run_id, note_no, level, item_key, runtime_side,
+         decision, alias_text, merge_target_key, comment, reviewer, reviewed_at, created_at, updated_at)
+        values
+        (#{projectId}, #{decisionKey}, #{viewMode}, #{runId}, #{noteNo}, #{level}, #{itemKey}, #{runtimeSide},
+         #{decision}, #{aliasText}, #{mergeTargetKey}, #{comment}, #{reviewer}, #{reviewedAt}, #{createdAt}, #{updatedAt})
+        on duplicate key update
+            view_mode = values(view_mode),
+            run_id = values(run_id),
+            note_no = values(note_no),
+            level = values(level),
+            item_key = values(item_key),
+            runtime_side = values(runtime_side),
+            decision = values(decision),
+            alias_text = values(alias_text),
+            merge_target_key = values(merge_target_key),
+            comment = values(comment),
+            reviewer = values(reviewer),
+            reviewed_at = values(reviewed_at),
+            updated_at = values(updated_at)
+    </insert>
+
+    <select id="selectByProjectAndDecisionKey" resultType="StructureGtDecision">
+        select *
+        from structure_gt_decision
+        where project_id = #{projectId}
+          and decision_key = #{decisionKey}
+    </select>
+</mapper>

@@ -1,6 +1,128 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.jzyz.gtreviewassistant.mapper.StructureCoverageMapper">
+    <sql id="rowSearchKey">
+        regexp_replace(
+            lower(concat_ws('|',
+                coalesce(s.table_title, ''),
+                coalesce(s.row_key, ''),
+                coalesce(s.row_path, ''),
+                coalesce(s.row_leaf, ''),
+                coalesce(s.source_locator, '')
+            )),
+            '[[:space:]　/／!！_|:：;；,，.。()（）－—-]+',
+            ''
+        )
+    </sql>
+
+    <sql id="columnSearchKey">
+        regexp_replace(
+            lower(concat_ws('|',
+                coalesce(s.table_title, ''),
+                coalesce(s.column_key, ''),
+                coalesce(s.column_path, ''),
+                coalesce(s.column_leaf, ''),
+                coalesce(s.source_locator, '')
+            )),
+            '[[:space:]　/／!！_|:：;；,，.。()（）－—-]+',
+            ''
+        )
+    </sql>
+
+    <sql id="cellSearchKey">
+        regexp_replace(
+            lower(concat_ws('|',
+                coalesce(s.table_title, ''),
+                coalesce(s.row_key, ''),
+                coalesce(s.row_path, ''),
+                coalesce(s.column_key, ''),
+                coalesce(s.column_path, ''),
+                coalesce(s.value_text, ''),
+                coalesce(s.normalized_value, ''),
+                coalesce(s.source_locator, '')
+            )),
+            '[[:space:]　/／!！_|:：;；,，.。()（）－—-]+',
+            ''
+        )
+    </sql>
+
+    <sql id="runtimeSearchKey">
+        regexp_replace(
+            lower(concat_ws('|',
+                coalesce(table_title, ''),
+                coalesce(table_profile_id, ''),
+                coalesce(row_key, ''),
+                coalesce(row_label, ''),
+                coalesce(row_path, ''),
+                coalesce(column_key, ''),
+                coalesce(column_label, ''),
+                coalesce(column_path, ''),
+                coalesce(value_text, ''),
+                coalesce(normalized_value, ''),
+                coalesce(value_signature, ''),
+                coalesce(cell_coordinate, ''),
+                coalesce(source_locator, ''),
+                coalesce(locator_method, '')
+            )),
+            '[[:space:]　/／!！_|:：;；,，.。()（）－—-]+',
+            ''
+        )
+    </sql>
+
+    <sql id="sourceMatchKey">
+        <choose>
+            <when test="level == 'row'">
+                coalesce(nullif(s.row_key, ''), nullif(s.row_leaf, ''), nullif(s.row_path, ''), s.item_key)
+            </when>
+            <when test="level == 'column'">
+                coalesce(nullif(s.column_key, ''), nullif(s.column_leaf, ''), nullif(s.column_path, ''), s.item_key)
+            </when>
+            <otherwise>
+                concat(
+                  coalesce(nullif(s.row_key, ''), nullif(s.row_path, ''), ''),
+                  '|',
+                  coalesce(nullif(s.column_key, ''), nullif(s.column_path, ''), '')
+                )
+            </otherwise>
+        </choose>
+    </sql>
+
+    <sql id="runtimeMatchKey">
+        <choose>
+            <when test="level == 'row'">
+                coalesce(nullif(row_key, ''), nullif(row_label, ''), nullif(row_path, ''), item_key)
+            </when>
+            <when test="level == 'column'">
+                coalesce(nullif(column_key, ''), nullif(column_label, ''), nullif(column_path, ''), item_key)
+            </when>
+            <otherwise>
+                concat(
+                  coalesce(nullif(row_key, ''), nullif(row_label, ''), nullif(row_path, ''), ''),
+                  '|',
+                  coalesce(nullif(column_key, ''), nullif(column_label, ''), nullif(column_path, ''), '')
+                )
+            </otherwise>
+        </choose>
+    </sql>
+
+    <sql id="runtimeMatchKeyR">
+        <choose>
+            <when test="level == 'row'">
+                coalesce(nullif(r.row_key, ''), nullif(r.row_label, ''), nullif(r.row_path, ''), r.item_key)
+            </when>
+            <when test="level == 'column'">
+                coalesce(nullif(r.column_key, ''), nullif(r.column_label, ''), nullif(r.column_path, ''), r.item_key)
+            </when>
+            <otherwise>
+                concat(
+                  coalesce(nullif(r.row_key, ''), nullif(r.row_label, ''), nullif(r.row_path, ''), ''),
+                  '|',
+                  coalesce(nullif(r.column_key, ''), nullif(r.column_label, ''), nullif(r.column_path, ''), '')
+                )
+            </otherwise>
+        </choose>
+    </sql>
+
     <sql id="runtimeSelectColumns">
         <choose>
             <when test="runId != null">
@@ -36,9 +158,9 @@
         <if test="runId != null">
             left join (
                 select
-                    item_key,
+                    match_key,
+                    runtime_side,
                     count(*) as runtime_match_count,
-                    group_concat(distinct runtime_side order by runtime_side separator '/') as runtime_side,
                     max(concat(coalesce(table_title, '未命名表'), ' / runtime ', level)) as runtime_title,
                     max(concat(
                         '行：', coalesce(nullif(row_label, ''), nullif(row_key, ''), nullif(row_path, ''), '未识别行名'),
@@ -50,13 +172,34 @@
                     max(confidence_level) as runtime_confidence_level,
                     max(source_artifact) as runtime_source_artifact,
                     max(locator_method) as runtime_locator_method
-                from runtime_structure_item
-                where project_id = #{projectId}
-                  and run_id = #{runId}
-                  and note_no = #{noteNo}
-                  and level = #{level}
-                group by item_key
-            ) r on r.item_key = s.item_key
+                from (
+                    select
+                        <include refid="runtimeMatchKey" /> as match_key,
+                        runtime_side,
+                        table_title,
+                        level,
+                        row_label,
+                        row_key,
+                        row_path,
+                        column_label,
+                        column_key,
+                        column_path,
+                        value_text,
+                        value_signature,
+                        cell_coordinate,
+                        source_locator,
+                        locator_method,
+                        confidence_level,
+                        source_artifact
+                    from runtime_structure_item
+                    where project_id = #{projectId}
+                      and run_id = #{runId}
+                      and note_no = #{noteNo}
+                      and level = #{level}
+                ) runtime_base
+                group by match_key, runtime_side
+            ) r on r.match_key = <include refid="sourceMatchKey" />
+               and r.runtime_side = s.side
         </if>
     </sql>
 
@@ -69,12 +212,177 @@
         </if>
     </sql>
 
+    <sql id="sourceTable">
+        <choose>
+            <when test="level == 'row'">structure_row</when>
+            <when test="level == 'column'">structure_column</when>
+            <otherwise>structure_cell</otherwise>
+        </choose>
+    </sql>
+
+    <sql id="coverageDecisionKey">
+        md5(concat(
+            'coverage|',
+            coalesce(cast(#{runId} as char), 'no-run'),
+            '|', #{noteNo},
+            '|', #{level},
+            '|', <include refid="sourceMatchKey" />
+        ))
+    </sql>
+
+    <sql id="coverageDecisionJoin">
+        left join structure_gt_decision d
+          on d.project_id = s.project_id
+         and d.decision_key = <include refid="coverageDecisionKey" />
+    </sql>
+
+    <sql id="notePreviewJoin">
+        left join structure_note pdf_note
+          on pdf_note.project_id = s.project_id
+         and pdf_note.note_no = s.note_no
+         and pdf_note.side = 'PDF'
+        left join structure_note excel_note
+          on excel_note.project_id = s.project_id
+         and excel_note.note_no = s.note_no
+         and excel_note.side = 'EXCEL'
+    </sql>
+
+    <sql id="rowCoverageOrder">
+        order by
+            coalesce(
+                min(case when s.side = 'EXCEL' then st.table_order end),
+                min(case when s.side = 'PDF' then st.table_order end),
+                2147483647
+            ),
+            coalesce(
+                min(case when s.side = 'EXCEL' then s.row_order end),
+                min(case when s.side = 'PDF' then s.row_order end),
+                2147483647
+            ),
+            item_key
+    </sql>
+
+    <sql id="decisionSelectColumns">
+        max(d.decision) as decision,
+        max(d.comment) as decision_comment,
+        max(d.alias_text) as alias_text,
+        max(d.merge_target_key) as merge_target_key,
+        max(d.reviewer) as reviewer,
+        max(d.reviewed_at) as reviewed_at,
+        max(d.updated_at) as decision_updated_at
+    </sql>
+
+    <sql id="sourcePreviewColumns">
+        coalesce(max(case when s.side = 'PDF' and s.source_locator is not null and s.source_locator != ''
+            then concat('/preview-assets/', #{projectId}, '/pdf/', md5(substring_index(s.source_locator, '!', 2)), '.png')
+        end), max(case when pdf_note.source_locator is not null and pdf_note.source_locator != ''
+            then concat('/preview-assets/', #{projectId}, '/pdf/', md5(substring_index(pdf_note.source_locator, '!', 2)), '.png')
+        end)) as pdf_preview_url,
+        coalesce(max(case when s.side = 'EXCEL' and s.source_locator is not null and s.source_locator != ''
+            then concat('/preview-assets/', #{projectId}, '/excel/', md5(s.source_locator), '.png')
+        end), max(case when excel_note.source_locator is not null and excel_note.source_locator != ''
+            then concat('/preview-assets/', #{projectId}, '/excel/', md5(excel_note.source_locator), '.png')
+        end)) as excel_preview_url
+    </sql>
+
+    <select id="selectCoverageSummary" resultType="com.jzyz.gtreviewassistant.domain.dto.StructureCoverageSummary">
+        select
+            #{projectId} as project_id,
+            #{noteNo} as note_no,
+            #{level} as level,
+            coalesce(src.source_total_count, 0) as source_total_count,
+            coalesce(src.pdf_count, 0) as pdf_count,
+            coalesce(src.excel_count, 0) as excel_count,
+            coalesce(src.both_side_count, 0) as both_side_count,
+            coalesce(src.pdf_only_count, 0) as pdf_only_count,
+            coalesce(src.excel_only_count, 0) as excel_only_count,
+            coalesce(src.runtime_matched_count, 0) as runtime_matched_count,
+            coalesce(src.runtime_missing_count, 0) as runtime_missing_count,
+            coalesce(runtime_only.runtime_only_count, 0) as runtime_only_count
+        from (select 1) seed
+        left join (
+            select
+                count(*) as source_total_count,
+                sum(has_pdf) as pdf_count,
+                sum(has_excel) as excel_count,
+                sum(case when has_pdf = 1 and has_excel = 1 then 1 else 0 end) as both_side_count,
+                sum(case when has_pdf = 1 and has_excel = 0 then 1 else 0 end) as pdf_only_count,
+                sum(case when has_pdf = 0 and has_excel = 1 then 1 else 0 end) as excel_only_count,
+                <choose>
+                    <when test="runId != null">
+                        sum(case when runtime_match_count > 0 then 1 else 0 end) as runtime_matched_count,
+                        sum(case when runtime_match_count = 0 then 1 else 0 end) as runtime_missing_count
+                    </when>
+                    <otherwise>
+                        0 as runtime_matched_count,
+                        0 as runtime_missing_count
+                    </otherwise>
+                </choose>
+            from (
+                select
+                    <include refid="sourceMatchKey" /> as match_key,
+                    max(case when s.side = 'PDF' then 1 else 0 end) as has_pdf,
+                    max(case when s.side = 'EXCEL' then 1 else 0 end) as has_excel,
+                    <choose>
+                        <when test="runId != null">count(distinct r.id) as runtime_match_count</when>
+                        <otherwise>0 as runtime_match_count</otherwise>
+                    </choose>
+                from <include refid="sourceTable" /> s
+                <if test="runId != null">
+                    left join runtime_structure_item r
+                      on r.project_id = s.project_id
+                     and r.run_id = #{runId}
+                     and r.note_no = s.note_no
+                     and r.level = #{level}
+                     and r.runtime_side = s.side
+                     and <include refid="runtimeMatchKeyR" /> = <include refid="sourceMatchKey" />
+                </if>
+                where s.project_id = #{projectId}
+                  and s.note_no = #{noteNo}
+                group by match_key
+            ) grouped_source
+        ) src on 1 = 1
+        left join (
+            <choose>
+                <when test="runId != null">
+                    select count(*) as runtime_only_count
+                    from (
+                        select distinct runtime_base.runtime_side, runtime_base.match_key
+                        from (
+                            select
+                                runtime_side,
+                                <include refid="runtimeMatchKey" /> as match_key
+                            from runtime_structure_item
+                            where project_id = #{projectId}
+                              and run_id = #{runId}
+                              and note_no = #{noteNo}
+                              and level = #{level}
+                        ) runtime_base
+                        left join (
+                            select distinct
+                                s.side,
+                                <include refid="sourceMatchKey" /> as match_key
+                            from <include refid="sourceTable" /> s
+                            where s.project_id = #{projectId}
+                              and s.note_no = #{noteNo}
+                        ) source_keys on source_keys.side = runtime_base.runtime_side
+                                     and source_keys.match_key = runtime_base.match_key
+                        where source_keys.match_key is null
+                    ) runtime_only_grouped
+                </when>
+                <otherwise>
+                    select 0 as runtime_only_count
+                </otherwise>
+            </choose>
+        ) runtime_only on 1 = 1
+    </select>
+
     <select id="selectCoverageItems" resultType="com.jzyz.gtreviewassistant.domain.dto.StructureCoverageItem">
         <choose>
             <when test="level == 'row'">
                 select
                     'row' as level,
-                    s.item_key as item_key,
+                    <include refid="sourceMatchKey" /> as item_key,
                     max(s.note_no) as note_no,
                     max(case when s.side = 'PDF' then concat(coalesce(s.table_title, '未命名表'), ' / 行') end) as pdf_title,
                     max(case when s.side = 'PDF' then coalesce(nullif(s.row_path, ''), nullif(s.row_leaf, ''), s.row_key) end) as pdf_detail,
@@ -82,9 +390,16 @@
                     max(case when s.side = 'EXCEL' then concat(coalesce(s.table_title, '未命名表'), ' / 行') end) as excel_title,
                     max(case when s.side = 'EXCEL' then coalesce(nullif(s.row_path, ''), nullif(s.row_leaf, ''), s.row_key) end) as excel_detail,
                     max(case when s.side = 'EXCEL' then s.source_locator end) as excel_locator,
-                    <include refid="runtimeSelectColumns" />
+                    <include refid="sourcePreviewColumns" />,
+                    <include refid="runtimeSelectColumns" />,
+                    max(<include refid="coverageDecisionKey" />) as decision_key,
+                    'coverage' as view_mode,
+                    <include refid="decisionSelectColumns" />
                 from structure_row s
+                left join structure_table st on st.id = s.table_id
                 <include refid="runtimeJoin" />
+                <include refid="coverageDecisionJoin" />
+                <include refid="notePreviewJoin" />
                 where s.project_id = #{projectId}
                   and s.note_no = #{noteNo}
                 <if test="keyword != null and keyword != ''">
@@ -94,16 +409,19 @@
                     or s.row_path like concat('%', #{keyword}, '%')
                     or s.row_leaf like concat('%', #{keyword}, '%')
                     or s.source_locator like concat('%', #{keyword}, '%')
+                    <if test="normalizedKeyword != null and normalizedKeyword != ''">
+                      or <include refid="rowSearchKey" /> like concat('%', #{normalizedKeyword}, '%')
+                    </if>
                   )
                 </if>
-                group by s.item_key
+                group by <include refid="sourceMatchKey" />
                 <include refid="runtimeHaving" />
-                order by s.item_key
+                <include refid="rowCoverageOrder" />
             </when>
             <when test="level == 'column'">
                 select
                     'column' as level,
-                    s.item_key as item_key,
+                    <include refid="sourceMatchKey" /> as item_key,
                     max(s.note_no) as note_no,
                     max(case when s.side = 'PDF' then concat(coalesce(s.table_title, '未命名表'), ' / 列名') end) as pdf_title,
                     max(case when s.side = 'PDF' then coalesce(nullif(s.column_path, ''), nullif(s.column_leaf, ''), s.column_key) end) as pdf_detail,
@@ -111,9 +429,15 @@
                     max(case when s.side = 'EXCEL' then concat(coalesce(s.table_title, '未命名表'), ' / 列名') end) as excel_title,
                     max(case when s.side = 'EXCEL' then coalesce(nullif(s.column_path, ''), nullif(s.column_leaf, ''), s.column_key) end) as excel_detail,
                     max(case when s.side = 'EXCEL' then s.source_locator end) as excel_locator,
-                    <include refid="runtimeSelectColumns" />
+                    <include refid="sourcePreviewColumns" />,
+                    <include refid="runtimeSelectColumns" />,
+                    max(<include refid="coverageDecisionKey" />) as decision_key,
+                    'coverage' as view_mode,
+                    <include refid="decisionSelectColumns" />
                 from structure_column s
                 <include refid="runtimeJoin" />
+                <include refid="coverageDecisionJoin" />
+                <include refid="notePreviewJoin" />
                 where s.project_id = #{projectId}
                   and s.note_no = #{noteNo}
                 <if test="keyword != null and keyword != ''">
@@ -123,16 +447,19 @@
                     or s.column_path like concat('%', #{keyword}, '%')
                     or s.column_leaf like concat('%', #{keyword}, '%')
                     or s.source_locator like concat('%', #{keyword}, '%')
+                    <if test="normalizedKeyword != null and normalizedKeyword != ''">
+                      or <include refid="columnSearchKey" /> like concat('%', #{normalizedKeyword}, '%')
+                    </if>
                   )
                 </if>
-                group by s.item_key
+                group by <include refid="sourceMatchKey" />
                 <include refid="runtimeHaving" />
-                order by s.item_key
+                order by item_key
             </when>
             <otherwise>
                 select
                     'cell' as level,
-                    s.item_key as item_key,
+                    <include refid="sourceMatchKey" /> as item_key,
                     max(s.note_no) as note_no,
                     max(case when s.side = 'PDF' then concat(coalesce(s.table_title, '未命名表'), ' / 单元格') end) as pdf_title,
                     max(case when s.side = 'PDF' then concat('行：', coalesce(nullif(s.row_path, ''), s.row_key, '未识别行名'), '；列：', coalesce(nullif(s.column_path, ''), s.column_key, '未识别列名'), '；值：', coalesce(nullif(s.value_text, ''), s.normalized_value, '空')) end) as pdf_detail,
@@ -140,9 +467,15 @@
                     max(case when s.side = 'EXCEL' then concat(coalesce(s.table_title, '未命名表'), ' / 单元格') end) as excel_title,
                     max(case when s.side = 'EXCEL' then concat('行：', coalesce(nullif(s.row_path, ''), s.row_key, '未识别行名'), '；列：', coalesce(nullif(s.column_path, ''), s.column_key, '未识别列名'), '；值：', coalesce(nullif(s.value_text, ''), s.normalized_value, '空')) end) as excel_detail,
                     max(case when s.side = 'EXCEL' then s.source_locator end) as excel_locator,
-                    <include refid="runtimeSelectColumns" />
+                    <include refid="sourcePreviewColumns" />,
+                    <include refid="runtimeSelectColumns" />,
+                    max(<include refid="coverageDecisionKey" />) as decision_key,
+                    'coverage' as view_mode,
+                    <include refid="decisionSelectColumns" />
                 from structure_cell s
                 <include refid="runtimeJoin" />
+                <include refid="coverageDecisionJoin" />
+                <include refid="notePreviewJoin" />
                 where s.project_id = #{projectId}
                   and s.note_no = #{noteNo}
                 <if test="keyword != null and keyword != ''">
@@ -155,12 +488,130 @@
                     or s.value_text like concat('%', #{keyword}, '%')
                     or s.normalized_value like concat('%', #{keyword}, '%')
                     or s.source_locator like concat('%', #{keyword}, '%')
+                    <if test="normalizedKeyword != null and normalizedKeyword != ''">
+                      or <include refid="cellSearchKey" /> like concat('%', #{normalizedKeyword}, '%')
+                    </if>
                   )
                 </if>
-                group by s.item_key
+                group by <include refid="sourceMatchKey" />
                 <include refid="runtimeHaving" />
-                order by s.item_key
+                order by item_key
             </otherwise>
         </choose>
+    </select>
+
+    <select id="selectRuntimeOnlyItems" resultType="com.jzyz.gtreviewassistant.domain.dto.StructureCoverageItem">
+        select
+            #{level} as level,
+            concat(runtime_base.runtime_side, '|', runtime_base.match_key) as item_key,
+            max(runtime_base.note_no) as note_no,
+            null as pdf_title,
+            null as pdf_detail,
+            null as pdf_locator,
+            null as excel_title,
+            null as excel_detail,
+            null as excel_locator,
+            true as runtime_recognized,
+            'RUNTIME_ONLY' as runtime_status,
+            cast(count(*) as signed) as runtime_match_count,
+            runtime_base.runtime_side as runtime_side,
+            max(concat(coalesce(runtime_base.table_title, '未命名表'), ' / runtime ', runtime_base.level)) as runtime_title,
+            max(concat(
+                '行：', coalesce(nullif(runtime_base.row_label, ''), nullif(runtime_base.row_key, ''), nullif(runtime_base.row_path, ''), '未识别行名'),
+                '；列：', coalesce(nullif(runtime_base.column_label, ''), nullif(runtime_base.column_key, ''), nullif(runtime_base.column_path, ''), '未识别列名'),
+                '；值：', coalesce(nullif(runtime_base.value_text, ''), nullif(runtime_base.value_signature, ''), '空')
+            )) as runtime_detail,
+            max(coalesce(nullif(runtime_base.cell_coordinate, ''), nullif(runtime_base.source_locator, ''), nullif(runtime_base.locator_method, ''))) as runtime_locator,
+            max(coalesce(nullif(runtime_base.value_text, ''), nullif(runtime_base.value_signature, ''))) as runtime_value_text,
+            max(runtime_base.confidence_level) as runtime_confidence_level,
+            max(runtime_base.source_artifact) as runtime_source_artifact,
+            max(runtime_base.locator_method) as runtime_locator_method,
+            max(md5(concat(
+                'runtimeOnly|',
+                cast(#{runId} as char),
+                '|', #{noteNo},
+                '|', #{level},
+                '|', runtime_base.runtime_side,
+                '|', runtime_base.match_key
+            ))) as decision_key,
+            'runtimeOnly' as view_mode,
+            max(d.decision) as decision,
+            max(d.comment) as decision_comment,
+            max(d.alias_text) as alias_text,
+            max(d.merge_target_key) as merge_target_key,
+            max(d.reviewer) as reviewer,
+            max(d.reviewed_at) as reviewed_at,
+            max(d.updated_at) as decision_updated_at
+        from (
+            select
+                runtime_side,
+                note_no,
+                level,
+                <include refid="runtimeMatchKey" /> as match_key,
+                table_title,
+                table_profile_id,
+                row_label,
+                row_key,
+                row_path,
+                column_label,
+                column_key,
+                column_path,
+                value_text,
+                normalized_value,
+                value_signature,
+                cell_coordinate,
+                source_locator,
+                locator_method,
+                confidence_level,
+                source_artifact
+            from runtime_structure_item
+            where project_id = #{projectId}
+              and run_id = #{runId}
+              and note_no = #{noteNo}
+              and level = #{level}
+              <if test="keyword != null and keyword != ''">
+                and (
+                    table_title like concat('%', #{keyword}, '%')
+                    or table_profile_id like concat('%', #{keyword}, '%')
+                    or row_key like concat('%', #{keyword}, '%')
+                    or row_label like concat('%', #{keyword}, '%')
+                    or row_path like concat('%', #{keyword}, '%')
+                    or column_key like concat('%', #{keyword}, '%')
+                    or column_label like concat('%', #{keyword}, '%')
+                    or column_path like concat('%', #{keyword}, '%')
+                    or value_text like concat('%', #{keyword}, '%')
+                    or normalized_value like concat('%', #{keyword}, '%')
+                    or value_signature like concat('%', #{keyword}, '%')
+                    or cell_coordinate like concat('%', #{keyword}, '%')
+                    or source_locator like concat('%', #{keyword}, '%')
+                    or locator_method like concat('%', #{keyword}, '%')
+                    <if test="normalizedKeyword != null and normalizedKeyword != ''">
+                      or <include refid="runtimeSearchKey" /> like concat('%', #{normalizedKeyword}, '%')
+                    </if>
+                )
+              </if>
+        ) runtime_base
+        left join (
+            select distinct
+                s.side,
+                <include refid="sourceMatchKey" /> as match_key
+            from <include refid="sourceTable" /> s
+            where s.project_id = #{projectId}
+              and s.note_no = #{noteNo}
+        ) source_keys on source_keys.side = runtime_base.runtime_side
+                     and source_keys.match_key = runtime_base.match_key
+        left join structure_gt_decision d
+          on d.project_id = #{projectId}
+         and d.decision_key = md5(concat(
+                'runtimeOnly|',
+                cast(#{runId} as char),
+                '|', #{noteNo},
+                '|', #{level},
+                '|', runtime_base.runtime_side,
+                '|', runtime_base.match_key
+             ))
+        where source_keys.match_key is null
+        group by runtime_base.runtime_side, runtime_base.match_key
+        order by runtime_base.runtime_side, runtime_base.match_key
     </select>
 </mapper>

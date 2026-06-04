@@ -6,11 +6,14 @@ import com.jzyz.gtreviewassistant.domain.dto.NoteDetail;
 import com.jzyz.gtreviewassistant.domain.dto.NoteSummary;
 import com.jzyz.gtreviewassistant.domain.dto.PageResult;
 import com.jzyz.gtreviewassistant.domain.dto.StructureCoverageItem;
+import com.jzyz.gtreviewassistant.domain.dto.StructureCoverageSummary;
+import com.jzyz.gtreviewassistant.domain.dto.StructureGtDecisionRequest;
 import com.jzyz.gtreviewassistant.domain.dto.StructureQualityDecisionRequest;
 import com.jzyz.gtreviewassistant.domain.dto.StructureImportRequest;
 import com.jzyz.gtreviewassistant.domain.dto.StructureOverview;
 import com.jzyz.gtreviewassistant.domain.dto.StructureQualityIssue;
 import com.jzyz.gtreviewassistant.domain.entity.StructureDiff;
+import com.jzyz.gtreviewassistant.domain.entity.StructureGtDecision;
 import com.jzyz.gtreviewassistant.domain.entity.StructureQualityDecision;
 import com.jzyz.gtreviewassistant.service.StructureCompareService;
 import com.jzyz.gtreviewassistant.service.StructureImportService;
@@ -39,7 +42,13 @@ public class StructureController {
     @PostMapping("/import")
     public ApiResponse<ImportResult> importStructure(@PathVariable Long projectId,
                                                      @Valid @RequestBody StructureImportRequest request) {
-        return ApiResponse.ok("结构台账已导入", importService.importStructure(projectId, request));
+        return ApiResponse.ok("结构GT台账已导入", importService.importStructure(projectId, request));
+    }
+
+    @PostMapping("/import-notes")
+    public ApiResponse<ImportResult> importStructureNotes(@PathVariable Long projectId,
+                                                          @Valid @RequestBody StructureImportRequest request) {
+        return ApiResponse.ok("Structure note imported safely", importService.importStructureNotes(projectId, request));
     }
 
     @PostMapping("/compare")
@@ -73,6 +82,31 @@ public class StructureController {
                                                                         @RequestParam(defaultValue = "1") int pageNum,
                                                                         @RequestParam(defaultValue = "20") int pageSize) {
         return ApiResponse.ok(queryService.coverageItems(projectId, noteNo, level, keyword, runId, matchStatus, pageNum, pageSize));
+    }
+
+    @GetMapping("/notes/{noteNo}/coverage/summary")
+    public ApiResponse<StructureCoverageSummary> coverageSummary(@PathVariable Long projectId,
+                                                                 @PathVariable String noteNo,
+                                                                 @RequestParam(defaultValue = "row") String level,
+                                                                 @RequestParam(required = false) Long runId) {
+        return ApiResponse.ok(queryService.coverageSummary(projectId, noteNo, level, runId));
+    }
+
+    @GetMapping("/notes/{noteNo}/coverage/runtime-only")
+    public ApiResponse<PageResult<StructureCoverageItem>> runtimeOnlyItems(@PathVariable Long projectId,
+                                                                           @PathVariable String noteNo,
+                                                                           @RequestParam(defaultValue = "row") String level,
+                                                                           @RequestParam(required = false) String keyword,
+                                                                           @RequestParam(required = false) Long runId,
+                                                                           @RequestParam(defaultValue = "1") int pageNum,
+                                                                           @RequestParam(defaultValue = "20") int pageSize) {
+        return ApiResponse.ok(queryService.runtimeOnlyItems(projectId, noteNo, level, keyword, runId, pageNum, pageSize));
+    }
+
+    @PostMapping("/gt-decisions")
+    public ApiResponse<StructureGtDecision> saveGtDecision(@PathVariable Long projectId,
+                                                           @Valid @RequestBody StructureGtDecisionRequest request) {
+        return ApiResponse.ok("结构GT裁决已保存", queryService.saveGtDecision(projectId, request));
     }
 
     @GetMapping("/quality/issues")

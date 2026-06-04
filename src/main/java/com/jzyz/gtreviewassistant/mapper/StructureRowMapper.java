@@ -12,6 +12,10 @@ public interface StructureRowMapper {
 
     int deleteByProjectAndSide(@Param("projectId") Long projectId, @Param("side") String side);
 
+    int deleteByProjectSideNote(@Param("projectId") Long projectId,
+                                @Param("side") String side,
+                                @Param("noteNo") String noteNo);
+
     List<StructureRow> selectByTableId(@Param("tableId") Long tableId);
 
     List<StructureRow> selectByProjectNoteSide(@Param("projectId") Long projectId,

@@ -12,6 +12,11 @@
         delete from structure_table where project_id = #{projectId} and side = #{side}
     </delete>
 
+    <delete id="deleteByProjectSideNote">
+        delete from structure_table
+        where project_id = #{projectId} and side = #{side} and note_no = #{noteNo}
+    </delete>
+
     <select id="selectById" resultType="StructureTable">
         select * from structure_table where id = #{id}
     </select>

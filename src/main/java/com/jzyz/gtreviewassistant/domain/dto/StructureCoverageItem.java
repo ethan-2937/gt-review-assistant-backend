@@ -2,6 +2,8 @@ package com.jzyz.gtreviewassistant.domain.dto;
 
 import lombok.Data;
 
+import java.time.LocalDateTime;
+
 @Data
 public class StructureCoverageItem {
     private String level;
@@ -11,10 +13,12 @@ public class StructureCoverageItem {
     private String pdfTitle;
     private String pdfDetail;
     private String pdfLocator;
+    private String pdfPreviewUrl;
 
     private String excelTitle;
     private String excelDetail;
     private String excelLocator;
+    private String excelPreviewUrl;
 
     private Boolean runtimeRecognized;
     private String runtimeStatus;
@@ -27,4 +31,14 @@ public class StructureCoverageItem {
     private String runtimeConfidenceLevel;
     private String runtimeSourceArtifact;
     private String runtimeLocatorMethod;
+
+    private String decisionKey;
+    private String viewMode;
+    private String decision;
+    private String decisionComment;
+    private String aliasText;
+    private String mergeTargetKey;
+    private String reviewer;
+    private LocalDateTime reviewedAt;
+    private LocalDateTime decisionUpdatedAt;
 }

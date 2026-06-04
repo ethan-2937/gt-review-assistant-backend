@@ -12,6 +12,10 @@ public interface StructureNoteMapper {
 
     int deleteByProjectAndSide(@Param("projectId") Long projectId, @Param("side") String side);
 
+    int deleteByProjectSideNote(@Param("projectId") Long projectId,
+                                @Param("side") String side,
+                                @Param("noteNo") String noteNo);
+
     StructureNote selectById(@Param("id") Long id);
 
     List<StructureNote> selectByProject(@Param("projectId") Long projectId);

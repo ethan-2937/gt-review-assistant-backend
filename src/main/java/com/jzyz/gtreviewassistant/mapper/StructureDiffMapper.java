@@ -12,6 +12,8 @@ public interface StructureDiffMapper {
 
     int deleteByProject(@Param("projectId") Long projectId);
 
+    int deleteByProjectAndNote(@Param("projectId") Long projectId, @Param("noteNo") String noteNo);
+
     List<StructureDiff> selectByProject(@Param("projectId") Long projectId,
                                          @Param("noteNo") String noteNo,
                                          @Param("diffLevel") String diffLevel);

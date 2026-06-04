@@ -21,7 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -42,6 +44,20 @@ public class StructureImportService {
         projectService.getRequired(projectId);
         String side = Side.normalize(request.getSide());
         deleteSide(projectId, side);
+        return insertNotes(projectId, side, request);
+    }
+
+    @Transactional
+    public ImportResult importStructureNotes(Long projectId, StructureImportRequest request) {
+        projectService.getRequired(projectId);
+        String side = Side.normalize(request.getSide());
+        for (String noteNo : noteNos(request)) {
+            deleteNote(projectId, side, noteNo);
+        }
+        return insertNotes(projectId, side, request);
+    }
+
+    private ImportResult insertNotes(Long projectId, String side, StructureImportRequest request) {
         LocalDateTime now = LocalDateTime.now();
 
         int noteCount = 0;
@@ -156,6 +172,17 @@ public class StructureImportService {
         return new ImportResult(side, noteCount, tableCount, rowCount, columnCount, cellCount);
     }
 
+    private Set<String> noteNos(StructureImportRequest request) {
+        Set<String> noteNos = new LinkedHashSet<>();
+        for (StructureImportRequest.NotePayload notePayload : request.getNotes()) {
+            String noteNo = TextKeys.clean(notePayload.getNoteNo());
+            if (!noteNo.isBlank()) {
+                noteNos.add(noteNo);
+            }
+        }
+        return noteNos;
+    }
+
     private void deleteSide(Long projectId, String side) {
         diffMapper.deleteByProject(projectId);
         cellMapper.deleteByProjectAndSide(projectId, side);
@@ -163,6 +190,15 @@ public class StructureImportService {
         rowMapper.deleteByProjectAndSide(projectId, side);
         tableMapper.deleteByProjectAndSide(projectId, side);
         noteMapper.deleteByProjectAndSide(projectId, side);
+    }
+
+    private void deleteNote(Long projectId, String side, String noteNo) {
+        diffMapper.deleteByProjectAndNote(projectId, noteNo);
+        cellMapper.deleteByProjectSideNote(projectId, side, noteNo);
+        columnMapper.deleteByProjectSideNote(projectId, side, noteNo);
+        rowMapper.deleteByProjectSideNote(projectId, side, noteNo);
+        tableMapper.deleteByProjectSideNote(projectId, side, noteNo);
+        noteMapper.deleteByProjectSideNote(projectId, side, noteNo);
     }
 
     private String rowItemKey(String tableTitle, String rowKey, String rowPath, String rowLeaf) {

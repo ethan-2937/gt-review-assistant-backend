@@ -14,6 +14,10 @@
         delete from structure_diff where project_id = #{projectId}
     </delete>
 
+    <delete id="deleteByProjectAndNote">
+        delete from structure_diff where project_id = #{projectId} and note_no = #{noteNo}
+    </delete>
+
     <select id="selectByProject" resultType="StructureDiff">
         select * from structure_diff
         where project_id = #{projectId}

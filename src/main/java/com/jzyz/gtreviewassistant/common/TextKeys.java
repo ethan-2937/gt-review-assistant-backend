@@ -1,5 +1,7 @@
 package com.jzyz.gtreviewassistant.common;
 
+import java.util.Locale;
+
 public final class TextKeys {
     private TextKeys() {
     }
@@ -18,6 +20,12 @@ public final class TextKeys {
                 .replace("／", "/")
                 .replace("\\", "/")
                 .replaceAll("\\s*/\\s*", "/");
+    }
+
+    public static String searchKey(String value) {
+        return clean(value)
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[\\s\\u3000/／\\\\\\-－—_|:：;；,，.。()（）]+", "");
     }
 
     public static String firstNonBlank(String... values) {

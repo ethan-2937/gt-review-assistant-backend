@@ -6,11 +6,14 @@ import com.jzyz.gtreviewassistant.domain.dto.NoteDetail;
 import com.jzyz.gtreviewassistant.domain.dto.NoteSummary;
 import com.jzyz.gtreviewassistant.domain.dto.PageResult;
 import com.jzyz.gtreviewassistant.domain.dto.StructureCoverageItem;
+import com.jzyz.gtreviewassistant.domain.dto.StructureCoverageSummary;
+import com.jzyz.gtreviewassistant.domain.dto.StructureGtDecisionRequest;
 import com.jzyz.gtreviewassistant.domain.dto.StructureQualityDecisionRequest;
 import com.jzyz.gtreviewassistant.domain.dto.StructureOverview;
 import com.jzyz.gtreviewassistant.domain.dto.StructureQualityIssue;
 import com.jzyz.gtreviewassistant.domain.dto.TableView;
 import com.jzyz.gtreviewassistant.domain.entity.StructureDiff;
+import com.jzyz.gtreviewassistant.domain.entity.StructureGtDecision;
 import com.jzyz.gtreviewassistant.domain.entity.StructureQualityDecision;
 import com.jzyz.gtreviewassistant.domain.entity.StructureNote;
 import com.jzyz.gtreviewassistant.domain.entity.StructureTable;
@@ -18,6 +21,7 @@ import com.jzyz.gtreviewassistant.mapper.StructureCoverageMapper;
 import com.jzyz.gtreviewassistant.mapper.StructureCellMapper;
 import com.jzyz.gtreviewassistant.mapper.StructureColumnMapper;
 import com.jzyz.gtreviewassistant.mapper.StructureDiffMapper;
+import com.jzyz.gtreviewassistant.mapper.StructureGtDecisionMapper;
 import com.jzyz.gtreviewassistant.mapper.StructureNoteMapper;
 import com.jzyz.gtreviewassistant.mapper.StructureQualityDecisionMapper;
 import com.jzyz.gtreviewassistant.mapper.StructureQualityMapper;
@@ -51,6 +55,7 @@ public class StructureQueryService {
     private final StructureCellMapper cellMapper;
     private final StructureDiffMapper diffMapper;
     private final StructureCoverageMapper coverageMapper;
+    private final StructureGtDecisionMapper gtDecisionMapper;
     private final StructureQualityMapper qualityMapper;
     private final StructureQualityDecisionMapper qualityDecisionMapper;
     private final RuntimeRunService runtimeRunService;
@@ -156,8 +161,10 @@ public class StructureQueryService {
         String safeMatchStatus = normalizeMatchStatus(matchStatus);
         int safePageNum = Math.max(pageNum, 1);
         int safePageSize = Math.min(Math.max(pageSize, 5), 100);
+        String cleanedKeyword = TextKeys.clean(keyword);
+        String normalizedKeyword = TextKeys.searchKey(keyword);
         PageHelper.startPage(safePageNum, safePageSize);
-        List<StructureCoverageItem> items = coverageMapper.selectCoverageItems(projectId, noteNo, safeLevel, TextKeys.clean(keyword), runId, safeMatchStatus);
+        List<StructureCoverageItem> items = coverageMapper.selectCoverageItems(projectId, noteNo, safeLevel, cleanedKeyword, normalizedKeyword, runId, safeMatchStatus);
         PageInfo<StructureCoverageItem> pageInfo = new PageInfo<>(items);
         return new PageResult<>(
                 pageInfo.getPageNum(),
@@ -166,6 +173,77 @@ public class StructureQueryService {
                 pageInfo.getPages(),
                 pageInfo.getList()
         );
+    }
+
+    public PageResult<StructureCoverageItem> runtimeOnlyItems(Long projectId,
+                                                              String noteNo,
+                                                              String level,
+                                                              String keyword,
+                                                              Long runId,
+                                                              int pageNum,
+                                                              int pageSize) {
+        projectService.getRequired(projectId);
+        String safeLevel = normalizeLevel(level);
+        int safePageNum = Math.max(pageNum, 1);
+        int safePageSize = Math.min(Math.max(pageSize, 5), 100);
+        if (runId == null) {
+            return new PageResult<>(safePageNum, safePageSize, 0, 0, List.of());
+        }
+        runtimeRunService.getRequired(projectId, runId);
+        String cleanedKeyword = TextKeys.clean(keyword);
+        String normalizedKeyword = TextKeys.searchKey(keyword);
+        PageHelper.startPage(safePageNum, safePageSize);
+        List<StructureCoverageItem> items = coverageMapper.selectRuntimeOnlyItems(projectId, noteNo, safeLevel, cleanedKeyword, normalizedKeyword, runId);
+        PageInfo<StructureCoverageItem> pageInfo = new PageInfo<>(items);
+        return new PageResult<>(
+                pageInfo.getPageNum(),
+                pageInfo.getPageSize(),
+                pageInfo.getTotal(),
+                pageInfo.getPages(),
+                pageInfo.getList()
+        );
+    }
+
+    public StructureCoverageSummary coverageSummary(Long projectId, String noteNo, String level, Long runId) {
+        projectService.getRequired(projectId);
+        if (runId != null) {
+            runtimeRunService.getRequired(projectId, runId);
+        }
+        String safeLevel = normalizeLevel(level);
+        StructureCoverageSummary summary = coverageMapper.selectCoverageSummary(projectId, noteNo, safeLevel, runId);
+        if (summary == null) {
+            summary = new StructureCoverageSummary();
+            summary.setProjectId(projectId);
+            summary.setNoteNo(noteNo);
+            summary.setLevel(safeLevel);
+        }
+        fillSummaryNulls(summary);
+        return summary;
+    }
+
+    @Transactional
+    public StructureGtDecision saveGtDecision(Long projectId, StructureGtDecisionRequest request) {
+        projectService.getRequired(projectId);
+        LocalDateTime now = LocalDateTime.now();
+        StructureGtDecision decision = new StructureGtDecision();
+        decision.setProjectId(projectId);
+        decision.setDecisionKey(TextKeys.clean(request.getDecisionKey()));
+        decision.setViewMode(normalizeViewMode(request.getViewMode()));
+        decision.setRunId(request.getRunId());
+        decision.setNoteNo(TextKeys.clean(request.getNoteNo()));
+        decision.setLevel(normalizeLevel(request.getLevel()));
+        decision.setItemKey(TextKeys.clean(request.getItemKey()));
+        decision.setRuntimeSide(TextKeys.clean(request.getRuntimeSide()).toUpperCase(Locale.ROOT));
+        decision.setDecision(normalizeGtDecision(request.getDecision()));
+        decision.setAliasText(TextKeys.clean(request.getAliasText()));
+        decision.setMergeTargetKey(TextKeys.clean(request.getMergeTargetKey()));
+        decision.setComment(TextKeys.clean(request.getComment()));
+        decision.setReviewer(TextKeys.firstNonBlank(request.getReviewer(), "local-user"));
+        decision.setReviewedAt(now);
+        decision.setCreatedAt(now);
+        decision.setUpdatedAt(now);
+        gtDecisionMapper.upsert(decision);
+        return gtDecisionMapper.selectByProjectAndDecisionKey(projectId, decision.getDecisionKey());
     }
 
     public PageResult<StructureQualityIssue> qualityIssues(Long projectId,
@@ -232,6 +310,18 @@ public class StructureQueryService {
         return cleaned;
     }
 
+    private void fillSummaryNulls(StructureCoverageSummary summary) {
+        if (summary.getSourceTotalCount() == null) summary.setSourceTotalCount(0);
+        if (summary.getPdfCount() == null) summary.setPdfCount(0);
+        if (summary.getExcelCount() == null) summary.setExcelCount(0);
+        if (summary.getBothSideCount() == null) summary.setBothSideCount(0);
+        if (summary.getPdfOnlyCount() == null) summary.setPdfOnlyCount(0);
+        if (summary.getExcelOnlyCount() == null) summary.setExcelOnlyCount(0);
+        if (summary.getRuntimeMatchedCount() == null) summary.setRuntimeMatchedCount(0);
+        if (summary.getRuntimeMissingCount() == null) summary.setRuntimeMissingCount(0);
+        if (summary.getRuntimeOnlyCount() == null) summary.setRuntimeOnlyCount(0);
+    }
+
     private String normalizeMatchStatus(String matchStatus) {
         String cleaned = TextKeys.clean(matchStatus);
         if (cleaned.isEmpty() || "all".equalsIgnoreCase(cleaned)) {
@@ -242,6 +332,32 @@ public class StructureQueryService {
             throw new IllegalArgumentException("matchStatus 只能是 all、matched 或 missing");
         }
         return lower;
+    }
+
+    private String normalizeViewMode(String viewMode) {
+        String cleaned = TextKeys.clean(viewMode);
+        if (cleaned.isEmpty()) {
+            return "coverage";
+        }
+        if (!List.of("coverage", "runtimeOnly").contains(cleaned)) {
+            throw new IllegalArgumentException("viewMode must be coverage or runtimeOnly");
+        }
+        return cleaned;
+    }
+
+    private String normalizeGtDecision(String decision) {
+        String cleaned = TextKeys.clean(decision).toUpperCase(Locale.ROOT);
+        List<String> allowed = List.of(
+                "STRUCTURE_GT_KEEP",
+                "STRUCTURE_GT_EXCLUDE",
+                "STRUCTURE_GT_ALIAS",
+                "STRUCTURE_GT_MERGE",
+                "STRUCTURE_GT_PENDING"
+        );
+        if (!allowed.contains(cleaned)) {
+            throw new IllegalArgumentException("decision is not supported");
+        }
+        return cleaned;
     }
 
     private String normalizeOptionalSide(String side) {
