@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.jzyz.gtreviewassistant.mapper.ProblemGtDecisionMapper">
+    <insert id="upsert" parameterType="ProblemGtDecision" useGeneratedKeys="true" keyProperty="id">
+        insert into problem_gt_decision
+        (project_id, candidate_key, candidate_id, decision, issue_type, comment, reviewer, reviewed_at, created_at, updated_at)
+        values
+        (#{projectId}, #{candidateKey}, #{candidateId}, #{decision}, #{issueType}, #{comment}, #{reviewer}, #{reviewedAt}, #{createdAt}, #{updatedAt})
+        on duplicate key update
+            candidate_id = values(candidate_id),
+            decision = values(decision),
+            issue_type = values(issue_type),
+            comment = values(comment),
+            reviewer = values(reviewer),
+            reviewed_at = values(reviewed_at),
+            updated_at = values(updated_at)
+    </insert>
+
+    <select id="selectByProjectAndCandidateKey" resultType="ProblemGtDecision">
+        select *
+        from problem_gt_decision
+        where project_id = #{projectId}
+          and candidate_key = #{candidateKey}
+    </select>
+</mapper>

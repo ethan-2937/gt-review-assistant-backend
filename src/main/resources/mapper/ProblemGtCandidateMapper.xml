@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.jzyz.gtreviewassistant.mapper.ProblemGtCandidateMapper">
+    <insert id="insert" parameterType="ProblemGtCandidate" useGeneratedKeys="true" keyProperty="id">
+        insert into problem_gt_candidate
+        (project_id, source_run_key, candidate_id, candidate_key, note_no, note_name, folder, source,
+         bucket, risk, recommended_action, suggested_issue_type, reason, candidate_kind, priority, period_bucket,
+         table_path, section_path, row_label, column_label, period_label, source_value, target_value,
+         missing_cells, missing_values, current_gt_overlap, current_final_hint, manual_decision, manual_rationale,
+         source_locator, target_locator, pdf_context, raw_payload_json, created_at, updated_at)
+        values
+        (#{projectId}, #{sourceRunKey}, #{candidateId}, #{candidateKey}, #{noteNo}, #{noteName}, #{folder}, #{source},
+         #{bucket}, #{risk}, #{recommendedAction}, #{suggestedIssueType}, #{reason}, #{candidateKind}, #{priority}, #{periodBucket},
+         #{tablePath}, #{sectionPath}, #{rowLabel}, #{columnLabel}, #{periodLabel}, #{sourceValue}, #{targetValue},
+         #{missingCells}, #{missingValues}, #{currentGtOverlap}, #{currentFinalHint}, #{manualDecision}, #{manualRationale},
+         #{sourceLocator}, #{targetLocator}, #{pdfContext}, #{rawPayloadJson}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <insert id="insertBatch">
+        insert into problem_gt_candidate
+        (project_id, source_run_key, candidate_id, candidate_key, note_no, note_name, folder, source,
+         bucket, risk, recommended_action, suggested_issue_type, reason, candidate_kind, priority, period_bucket,
+         table_path, section_path, row_label, column_label, period_label, source_value, target_value,
+         missing_cells, missing_values, current_gt_overlap, current_final_hint, manual_decision, manual_rationale,
+         source_locator, target_locator, pdf_context, raw_payload_json, created_at, updated_at)
+        values
+        <foreach collection="candidates" item="candidate" separator=",">
+            (#{candidate.projectId}, #{candidate.sourceRunKey}, #{candidate.candidateId}, #{candidate.candidateKey},
+             #{candidate.noteNo}, #{candidate.noteName}, #{candidate.folder}, #{candidate.source},
+             #{candidate.bucket}, #{candidate.risk}, #{candidate.recommendedAction}, #{candidate.suggestedIssueType},
+             #{candidate.reason}, #{candidate.candidateKind}, #{candidate.priority}, #{candidate.periodBucket},
+             #{candidate.tablePath}, #{candidate.sectionPath}, #{candidate.rowLabel}, #{candidate.columnLabel},
+             #{candidate.periodLabel}, #{candidate.sourceValue}, #{candidate.targetValue},
+             #{candidate.missingCells}, #{candidate.missingValues}, #{candidate.currentGtOverlap},
+             #{candidate.currentFinalHint}, #{candidate.manualDecision}, #{candidate.manualRationale},
+             #{candidate.sourceLocator}, #{candidate.targetLocator}, #{candidate.pdfContext},
+             #{candidate.rawPayloadJson}, #{candidate.createdAt}, #{candidate.updatedAt})
+        </foreach>
+    </insert>
+
+    <delete id="deleteByProjectAndRunKey">
+        delete from problem_gt_candidate
+        where project_id = #{projectId}
+          and source_run_key = #{sourceRunKey}
+    </delete>
+
+    <select id="selectOverview" resultType="com.jzyz.gtreviewassistant.domain.dto.ProblemGtOverview">
+        select
+            count(*) as total_count,
+            sum(case when c.risk = 'high' then 1 else 0 end) as high_count,
+            sum(case when c.risk = 'medium' then 1 else 0 end) as medium_count,
+            sum(case when c.risk = 'manual_reused' then 1 else 0 end) as manual_reused_count,
+            sum(case when c.bucket in ('covered_by_source_gt_index', 'maybe_covered_by_current_final', 'pdf_value_maybe_covered') then 1 else 0 end) as covered_count,
+            sum(case when c.bucket = 'locked_confirmed_skip' then 1 else 0 end) as locked_count,
+            sum(case when c.bucket = 'low_confidence_pdf_extra_value_pool' then 1 else 0 end) as pdf_low_count,
+            sum(case when d.decision is null then 1 else 0 end) as undecided_count,
+            sum(case when d.decision = 'ADD_TO_FINAL' then 1 else 0 end) as add_count,
+            sum(case when d.decision = 'EXCLUDE' then 1 else 0 end) as exclude_count,
+            sum(case when d.decision = 'DUPLICATE' then 1 else 0 end) as duplicate_count,
+            (
+                select source_run_key
+                from problem_gt_candidate
+                where project_id = #{projectId}
+                order by updated_at desc, id desc
+                limit 1
+            ) as latest_source_run_key
+        from problem_gt_candidate c
+        left join problem_gt_decision d
+          on d.project_id = c.project_id and d.candidate_key = c.candidate_key
+        where c.project_id = #{projectId}
+          and c.source_run_key = (
+              select latest.source_run_key
+              from (
+                  select source_run_key
+                  from problem_gt_candidate
+                  where project_id = #{projectId}
+                  order by updated_at desc, id desc
+                  limit 1
+              ) latest
+          )
+    </select>
+
+    <sql id="reviewFilters">
+        <if test="sourceRunKey != null and sourceRunKey != ''">
+            and c.source_run_key = #{sourceRunKey}
+        </if>
+        <if test="bucket != null and bucket != ''">
+            and c.bucket = #{bucket}
+        </if>
+        <if test="risk != null and risk != ''">
+            and c.risk = #{risk}
+        </if>
+        <if test="noteNo != null and noteNo != ''">
+            and c.note_no = #{noteNo}
+        </if>
+        <if test="decision != null and decision == 'UNDECIDED'">
+            and d.decision is null
+        </if>
+        <if test="decision != null and decision != '' and decision != 'UNDECIDED'">
+            and d.decision = #{decision}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            and (
+                c.candidate_id like concat('%', #{keyword}, '%')
+                or c.folder like concat('%', #{keyword}, '%')
+                or c.row_label like concat('%', #{keyword}, '%')
+                or c.column_label like concat('%', #{keyword}, '%')
+                or c.source_value like concat('%', #{keyword}, '%')
+                or c.target_value like concat('%', #{keyword}, '%')
+                or c.reason like concat('%', #{keyword}, '%')
+                or c.manual_rationale like concat('%', #{keyword}, '%')
+                or replace(replace(replace(lower(coalesce(c.row_label, '')), ' ', ''), '/', ''), '：', '') like concat('%', #{normalizedKeyword}, '%')
+            )
+        </if>
+    </sql>
+
+    <select id="selectReviewItems" resultType="com.jzyz.gtreviewassistant.domain.dto.ProblemGtReviewItem">
+        select
+            c.*,
+            d.decision as decision,
+            d.issue_type as decision_issue_type,
+            d.comment as decision_comment,
+            d.reviewer as reviewer,
+            d.reviewed_at as reviewed_at,
+            d.updated_at as decision_updated_at
+        from problem_gt_candidate c
+        left join problem_gt_decision d
+          on d.project_id = c.project_id and d.candidate_key = c.candidate_key
+        where c.project_id = #{projectId}
+        <include refid="reviewFilters" />
+        order by
+            case c.risk when 'high' then 1 when 'medium' then 2 when 'manual_reused' then 3 when 'low' then 4 when 'skip' then 5 else 6 end,
+            case c.bucket
+                when 'high_confidence_possible_missing' then 1
+                when 'medium_confidence_possible_missing' then 2
+                when 'manual_confirmed_add_check_final' then 3
+                when 'manual_optional_or_dedup' then 4
+                when 'maybe_covered_by_current_final' then 5
+                else 9
+            end,
+            case when c.note_no regexp '^[0-9]+$' then cast(c.note_no as unsigned) else 999999 end,
+            c.note_no,
+            c.priority,
+            c.id
+    </select>
+
+    <select id="selectExportItems" resultType="com.jzyz.gtreviewassistant.domain.dto.ProblemGtReviewItem">
+        select
+            c.*,
+            d.decision as decision,
+            d.issue_type as decision_issue_type,
+            d.comment as decision_comment,
+            d.reviewer as reviewer,
+            d.reviewed_at as reviewed_at,
+            d.updated_at as decision_updated_at
+        from problem_gt_candidate c
+        left join problem_gt_decision d
+          on d.project_id = c.project_id and d.candidate_key = c.candidate_key
+        where c.project_id = #{projectId}
+          and c.source_run_key = #{sourceRunKey}
+        order by
+            case when d.decision is null then 9 else 1 end,
+            case d.decision
+                when 'ADD_TO_FINAL' then 1
+                when 'CHANGE_TYPE' then 2
+                when 'TABLE_MERGE' then 3
+                when 'DUPLICATE' then 4
+                when 'EXCLUDE' then 5
+                when 'NEED_RECHECK' then 6
+                when 'PENDING' then 7
+                else 8
+            end,
+            case when c.note_no regexp '^[0-9]+$' then cast(c.note_no as unsigned) else 999999 end,
+            c.note_no,
+            c.priority,
+            c.id
+    </select>
+</mapper>
