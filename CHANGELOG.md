@@ -78,3 +78,24 @@
 ### Safety
 
 - Batch decisions only upsert review decisions; candidate rows and original GT workbooks are not modified.
+
+## v2.2 - 2026-06-05
+
+Problem GT preview background task.
+
+### Added
+
+- Added `POST /api/projects/{projectId}/problem-gt/previews/generate` to start a background screenshot generation task.
+- Added `GET /api/projects/{projectId}/problem-gt/previews/tasks/{taskId}` to poll task status and worker output tail.
+- Added in-memory task tracking with a single-thread worker executor so users do not need to copy PowerShell commands for normal preview generation.
+- Docker backend image now includes Python, openpyxl, PyMuPDF, Pillow, and Noto CJK fonts for server-side preview rendering.
+
+### Validation
+
+- `docker compose build backend` passed.
+- Backend task API passed with `limit=20`.
+- Full backend task passed for `problem_gt_mvp_202506_v16_fast3`: 315 candidates, exit code 0.
+
+### Safety
+
+- The task calls the worker in read-only mode against mounted source files. It only writes preview assets under `/workspace/preview_assets`.

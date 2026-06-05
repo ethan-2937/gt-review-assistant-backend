@@ -8,8 +8,11 @@ import com.jzyz.gtreviewassistant.domain.dto.ProblemGtDecisionRequest;
 import com.jzyz.gtreviewassistant.domain.dto.ProblemGtImportRequest;
 import com.jzyz.gtreviewassistant.domain.dto.ProblemGtImportResult;
 import com.jzyz.gtreviewassistant.domain.dto.ProblemGtOverview;
+import com.jzyz.gtreviewassistant.domain.dto.ProblemGtPreviewTaskRequest;
+import com.jzyz.gtreviewassistant.domain.dto.ProblemGtPreviewTaskStatus;
 import com.jzyz.gtreviewassistant.domain.dto.ProblemGtReviewItem;
 import com.jzyz.gtreviewassistant.domain.entity.ProblemGtDecision;
+import com.jzyz.gtreviewassistant.service.ProblemGtPreviewTaskService;
 import com.jzyz.gtreviewassistant.service.ProblemGtService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/projects/{projectId}/problem-gt")
 public class ProblemGtController {
     private final ProblemGtService problemGtService;
+    private final ProblemGtPreviewTaskService previewTaskService;
 
     @PostMapping("/import")
     public ApiResponse<ProblemGtImportResult> importCandidates(@PathVariable Long projectId,
@@ -64,6 +68,18 @@ public class ProblemGtController {
     public ApiResponse<ProblemGtBatchDecisionResult> saveBatchDecision(@PathVariable Long projectId,
                                                                        @Valid @RequestBody ProblemGtBatchDecisionRequest request) {
         return ApiResponse.ok("问题GT批量裁决已保存", problemGtService.saveBatchDecision(projectId, request));
+    }
+
+    @PostMapping("/previews/generate")
+    public ApiResponse<ProblemGtPreviewTaskStatus> generatePreviews(@PathVariable Long projectId,
+                                                                    @RequestBody(required = false) ProblemGtPreviewTaskRequest request) {
+        return ApiResponse.ok("问题GT截图生成任务已启动", previewTaskService.start(projectId, request == null ? new ProblemGtPreviewTaskRequest() : request));
+    }
+
+    @GetMapping("/previews/tasks/{taskId}")
+    public ApiResponse<ProblemGtPreviewTaskStatus> previewTask(@PathVariable Long projectId,
+                                                               @PathVariable String taskId) {
+        return ApiResponse.ok(previewTaskService.get(taskId));
     }
 
     @GetMapping("/export.json")
