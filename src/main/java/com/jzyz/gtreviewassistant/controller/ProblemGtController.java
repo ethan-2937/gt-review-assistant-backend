@@ -2,6 +2,8 @@ package com.jzyz.gtreviewassistant.controller;
 
 import com.jzyz.gtreviewassistant.common.ApiResponse;
 import com.jzyz.gtreviewassistant.domain.dto.PageResult;
+import com.jzyz.gtreviewassistant.domain.dto.ProblemGtBatchDecisionRequest;
+import com.jzyz.gtreviewassistant.domain.dto.ProblemGtBatchDecisionResult;
 import com.jzyz.gtreviewassistant.domain.dto.ProblemGtDecisionRequest;
 import com.jzyz.gtreviewassistant.domain.dto.ProblemGtImportRequest;
 import com.jzyz.gtreviewassistant.domain.dto.ProblemGtImportResult;
@@ -56,6 +58,12 @@ public class ProblemGtController {
     public ApiResponse<ProblemGtDecision> saveDecision(@PathVariable Long projectId,
                                                        @Valid @RequestBody ProblemGtDecisionRequest request) {
         return ApiResponse.ok("问题GT裁决已保存", problemGtService.saveDecision(projectId, request));
+    }
+
+    @PostMapping("/decisions/batch")
+    public ApiResponse<ProblemGtBatchDecisionResult> saveBatchDecision(@PathVariable Long projectId,
+                                                                       @Valid @RequestBody ProblemGtBatchDecisionRequest request) {
+        return ApiResponse.ok("问题GT批量裁决已保存", problemGtService.saveBatchDecision(projectId, request));
     }
 
     @GetMapping("/export.json")

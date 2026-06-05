@@ -175,4 +175,14 @@
             c.priority,
             c.id
     </select>
+
+    <select id="selectByProjectAndCandidateKeys" resultType="com.jzyz.gtreviewassistant.domain.entity.ProblemGtCandidate">
+        select *
+        from problem_gt_candidate
+        where project_id = #{projectId}
+          and candidate_key in
+          <foreach collection="candidateKeys" item="candidateKey" open="(" separator="," close=")">
+              #{candidateKey}
+          </foreach>
+    </select>
 </mapper>

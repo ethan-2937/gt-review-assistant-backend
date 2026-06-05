@@ -7,6 +7,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jzyz.gtreviewassistant.common.SimpleXlsxWriter;
 import com.jzyz.gtreviewassistant.common.TextKeys;
 import com.jzyz.gtreviewassistant.domain.dto.PageResult;
+import com.jzyz.gtreviewassistant.domain.dto.ProblemGtBatchDecisionRequest;
+import com.jzyz.gtreviewassistant.domain.dto.ProblemGtBatchDecisionResult;
 import com.jzyz.gtreviewassistant.domain.dto.ProblemGtDecisionRequest;
 import com.jzyz.gtreviewassistant.domain.dto.ProblemGtImportRequest;
 import com.jzyz.gtreviewassistant.domain.dto.ProblemGtImportResult;
@@ -26,10 +28,12 @@ import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -130,6 +134,47 @@ public class ProblemGtService {
         decision.setUpdatedAt(now);
         decisionMapper.upsert(decision);
         return decisionMapper.selectByProjectAndCandidateKey(projectId, decision.getCandidateKey());
+    }
+
+    @Transactional
+    public ProblemGtBatchDecisionResult saveBatchDecision(Long projectId, ProblemGtBatchDecisionRequest request) {
+        projectService.getRequired(projectId);
+        Set<String> candidateKeys = new LinkedHashSet<>();
+        for (String candidateKey : request.getCandidateKeys()) {
+            String cleaned = TextKeys.clean(candidateKey);
+            if (!cleaned.isEmpty()) {
+                candidateKeys.add(cleaned);
+            }
+        }
+        if (candidateKeys.isEmpty()) {
+            throw new IllegalArgumentException("select at least one problem GT candidate");
+        }
+
+        List<ProblemGtCandidate> candidates = candidateMapper.selectByProjectAndCandidateKeys(projectId, List.copyOf(candidateKeys));
+        LocalDateTime now = LocalDateTime.now();
+        String normalizedDecision = normalizeDecision(request.getDecision());
+        String reviewer = TextKeys.firstNonBlank(request.getReviewer(), "local-user");
+        Set<String> matchedKeys = new LinkedHashSet<>();
+        int savedCount = 0;
+        for (ProblemGtCandidate candidate : candidates) {
+            if (!matchedKeys.add(candidate.getCandidateKey())) {
+                continue;
+            }
+            ProblemGtDecision decision = new ProblemGtDecision();
+            decision.setProjectId(projectId);
+            decision.setCandidateKey(candidate.getCandidateKey());
+            decision.setCandidateId(candidate.getCandidateId());
+            decision.setDecision(normalizedDecision);
+            decision.setIssueType(TextKeys.clean(request.getIssueType()));
+            decision.setComment(TextKeys.clean(request.getComment()));
+            decision.setReviewer(reviewer);
+            decision.setReviewedAt(now);
+            decision.setCreatedAt(now);
+            decision.setUpdatedAt(now);
+            decisionMapper.upsert(decision);
+            savedCount++;
+        }
+        return new ProblemGtBatchDecisionResult(candidateKeys.size(), matchedKeys.size(), savedCount, candidateKeys.size() - matchedKeys.size());
     }
 
     public byte[] exportProposalJson(Long projectId, String sourceRunKey) {

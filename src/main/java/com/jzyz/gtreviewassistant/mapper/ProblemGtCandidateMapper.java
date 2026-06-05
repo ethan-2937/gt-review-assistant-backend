@@ -29,4 +29,7 @@ public interface ProblemGtCandidateMapper {
 
     List<ProblemGtReviewItem> selectExportItems(@Param("projectId") Long projectId,
                                                 @Param("sourceRunKey") String sourceRunKey);
+
+    List<ProblemGtCandidate> selectByProjectAndCandidateKeys(@Param("projectId") Long projectId,
+                                                             @Param("candidateKeys") List<String> candidateKeys);
 }

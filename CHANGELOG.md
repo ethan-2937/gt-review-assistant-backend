@@ -67,3 +67,14 @@
 
 - `docker compose build backend` ???
 - ????????????xlsx ?? openpyxl ???
+
+## v1.9 - 2026-06-05
+
+### Added
+
+- Added `POST /api/projects/{projectId}/problem-gt/decisions/batch` for batch problem-GT adjudication.
+- Batch adjudication validates candidate keys against the current project and returns requested/matched/saved/skipped counts.
+
+### Safety
+
+- Batch decisions only upsert review decisions; candidate rows and original GT workbooks are not modified.
